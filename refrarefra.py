@@ -225,12 +225,15 @@ class ParamCore:
         # Highlight cell settings:
         self.param_highlight_cell: bool = None
         self.param_highlight_cell_hue: str = None
+        self.param_highlight_cell_hue_default: str = None
         self.param_highlight_cell_pattern: PatternFill = None
 
         # Flag settings:
         self.param_flag_header_name: str = None
+        self.param_flag_header_name_default: str = None
         self.param_flag_header_col: str = None
         self.param_flag_value: str = None
+        self.param_flag_value_default: str = None
         self.param_flag_required: bool = False
 
         self._validated: bool = False
@@ -241,7 +244,18 @@ class ParamCore:
 
 
     def __repr__(self):
-        return str(self.__dict__)
+        param_repr = f'{self.param_check_custom_name} ({self.param_type_code})'
+        return param_repr
+
+    @property
+    def display(self):
+        display_string = '"{param_name}" {param_type_code} ({param_info}) @{param_target_worksheet}'.format(
+            param_name=self.param_check_custom_name,
+            param_type_code=self.param_type_code,
+            param_info=self._result_info,
+            param_target_worksheet=self.param_target_worksheet_name,
+            )
+        return display_string
 
     @property
     def validated(self):
@@ -320,18 +334,35 @@ class ParamCore:
         self._result = param_result
 
     def setup(self, **param_settings):
-        self.__dict__.update(param_settings)
 
+        # Getting default values:
+        self.param_flag_header_name = self.param_flag_header_name_default
+        self.param_flag_value = self.param_flag_value_default
+        self.param_highlight_cell_hue = self.param_highlight_cell_hue_default
+
+        # Setting up values according to settings inputs:
+        self.__dict__.update(param_settings)
+        self.param_highlight_cell_pattern = PatternFill(fill_type='solid',
+                                                        start_color=self.param_highlight_cell_hue,
+                                                        end_color=self.param_highlight_cell_hue)
 
 class ParamDuplicateRows(ParamCore):
 
     def __init__(self):
+        
+        # Core settings:
         super().__init__()
         self.param_type_name: str = 'Param Duplicate Rows'
         self.param_type_code: str = 'PDR'
-    
+
+        # Default settings:
+        self.param_flag_header_name_default: str = self.param_type_code
+        self.param_flag_value_default: str = 'Duplicate row'
+        self.param_highlight_cell_hue_default: str = '00c90404'
+
+
     def __repr__(self):
-        return str(self.__dict__)
+        return super().__repr__()
 
     def setup(self, **param_settings):
         super().setup(**param_settings)
@@ -347,6 +378,8 @@ class ParamDuplicateRows(ParamCore):
 class ParamDuplicateRowsPartial(ParamCore):
 
     def __init__(self):
+
+        # Core settings:
         super().__init__()
         self.param_type_name: str = 'Param Duplicate Rows Partial'
         self.param_type_code: str = 'PDR-P'
@@ -354,9 +387,14 @@ class ParamDuplicateRowsPartial(ParamCore):
         # Column list settings:
         self.param_column_list: list or str = None
         self.param_column_list_is_range: bool = None
+
+        # Default settings:
+        self.param_flag_header_name_default: str = self.param_type_code
+        self.param_flag_value_default: str = 'Duplicate row'
+        self.param_highlight_cell_hue_default: str = '00f54242'
     
     def __repr__(self):
-        return str(self.__dict__)
+        return super().__repr__()
 
     def _validate(self):
         super()._validate()
@@ -405,7 +443,10 @@ class ParamDuplicateRowsPartial(ParamCore):
         else:
             column_end = self.param_column_list[-1]
             for column in self.param_column_list:
-                column_list_str_res = f'{column_list_str_res}, {column}'
+                if column_list_str_res == '':
+                    column_list_str_res = f'{column}'
+                else:
+                    column_list_str_res = f'{column_list_str_res}, {column}'
         result_info_str = f'{column_list_str_res}'
         self._result_info = result_info_str
         
@@ -420,6 +461,8 @@ class ParamDuplicateRowsPartial(ParamCore):
 class ParamEmptyCells(ParamCore):
 
     def __init__(self):
+
+        # Core settings:
         super().__init__()
         self.param_type_name: str = 'Param Empty Cells'
         self.param_type_code: str = 'PEC'
@@ -427,9 +470,14 @@ class ParamEmptyCells(ParamCore):
         # Column list settings:
         self.param_column_list: list or str = None
         self.param_column_list_is_range: bool = None
+
+        # Default settings:
+        self.param_flag_header_name_default: str = self.param_type_code
+        self.param_flag_value_default: str = 'Empty cell'
+        self.param_highlight_cell_hue_default: str = '00e6cd45'
     
     def __repr__(self):
-        return str(self.__dict__)
+        return super().__repr__()
 
     def _validate(self):
         super()._validate()
@@ -478,7 +526,10 @@ class ParamEmptyCells(ParamCore):
         else:
             column_end = self.param_column_list[-1]
             for column in self.param_column_list:
-                column_list_str_res = f'{column_list_str_res}, {column}'
+                if column_list_str_res == '':
+                    column_list_str_res = f'{column}'
+                else:
+                    column_list_str_res = f'{column_list_str_res}, {column}'
         result_info_str = f'{column_list_str_res}'
         self._result_info = result_info_str
         
@@ -493,7 +544,11 @@ class ParamEmptyCells(ParamCore):
 class ParamCompareFlats(ParamCore):
     
     def __init__(self):
+        
+        # Core settings:
         super().__init__()
+
+        # Type name and code:
         self.param_type_name: str = 'Param Compare Flats'
         self.param_type_code: str = 'PCF'
 
@@ -506,9 +561,14 @@ class ParamCompareFlats(ParamCore):
         self.param_compare_axis: str = None
         self.param_compare_axis_inclusive: bool = False
         self.param_compare_operator: str = None
+
+        # Default settings:
+        self.param_flag_header_name_default: str = self.param_type_code
+        self.param_flag_value_default: str = 'Flat offset'
+        self.param_highlight_cell_hue_default: str = '001daecf'
     
     def __repr__(self):
-        return str(self.__dict__)
+        return super().__repr__()
 
     def _validate(self):
         super()._validate()
@@ -584,7 +644,10 @@ class ParamCompareFlats(ParamCore):
         else:
             column_end = self.param_column_list[-1]
             for column in self.param_column_list:
-                column_list_str_res = f'{column_list_str_res}, {column}'
+                if column_list_str_res == '':
+                    column_list_str_res = f'{column}'
+                else:
+                    column_list_str_res = f'{column_list_str_res}, {column}'
         result_info_str = f'{column_list_str_res}'
         self._result_info = result_info_str
         
@@ -599,12 +662,22 @@ class ParamCompareFlats(ParamCore):
 class ParamCompareSums(ParamCore):
     
     def __init__(self):
+
+        # Core settings:
         super().__init__()
         self.param_type_name: str = 'Param Compare Sums'
         self.param_type_code: str = 'PCS'
 
         # Column list settings:
         self.param_column_list: list or str = None
+
+        # Default settings:
+        self.param_flag_header_name_default: str = self.param_type_code
+        self.param_flag_value_default: str = 'Sum offset'
+        self.param_highlight_cell_hue_default: str = '00ff61ab'
+    
+    def __repr__(self):
+        return super().__repr__()
     
     def _validate(self):
         super()._validate()
@@ -1161,7 +1234,8 @@ class AppWindow(QMainWindow):
                         update_selected_parameter_settings()
                         selected_parameter_object.setup(**selected_parameter_settings)
 
-                        list_parameters.addItem(selected_parameter_object.param_type_code)
+                        list_parameters.addItem(selected_parameter_object.display)
+                        pprint(selected_parameter_object.__dict__)
 
                         # Removing widgets:
                         for ui_element in new_parameter_core_widget_list:
@@ -1213,9 +1287,9 @@ class AppWindow(QMainWindow):
                     ParamEmptyCells(),
                     ]
                 param_type_names_list = []
-                for param_type in param_class_object_list:
-                    param_type_name = f'{param_type.param_type_name} ({param_type.param_type_code})'
-                    param_type_names_list.append(param_type_name)
+                for param_object in param_class_object_list:
+                    param_type_option = f'{param_object.param_type_name} ({param_object.param_type_code})'
+                    param_type_names_list.append(param_type_option)
                 dropdown_new_parameter_type.addItems(param_type_names_list)
                 
                 # Setting UI elements as visible:
