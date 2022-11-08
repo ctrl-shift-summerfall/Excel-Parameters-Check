@@ -853,6 +853,7 @@ class AppWindow(QMainWindow):
             # Updating parameter manager buttons status:
             button_read.setDisabled(True)
             button_add.setDisabled(True)
+            button_edit.setDisabled(True)
 
         button_close_caption = 'Close'
         button_close = create_button(button_caption=button_close_caption)
@@ -885,8 +886,13 @@ class AppWindow(QMainWindow):
         # List "Parameters":
 
         def list_has_selected_items():
-            if len(list_parameters.selectedItems()) > 0: button_remove.setDisabled(False)
-            else: button_remove.setDisabled(True)
+            if len(list_parameters.selectedItems()) > 0: 
+                button_remove.setDisabled(False)
+                if not button_open.isEnabled():
+                    button_edit.setDisabled(False)
+            else: 
+                button_remove.setDisabled(True)
+                button_edit.setDisabled(True)
 
         list_parameters = QListWidget()
         list_parameters.itemSelectionChanged.connect(lambda: list_has_selected_items())
@@ -921,7 +927,7 @@ class AppWindow(QMainWindow):
                 button_read.setDisabled(True)           # Side menu
                 button_add.setDisabled(True)
                 button_remove.setDisabled(True)
-                button_validate.setDisabled(True)
+                button_edit.setDisabled(True)
                 button_save_param.setDisabled(True)
                 list_parameters.setDisabled(False)
 
@@ -1317,13 +1323,9 @@ class AppWindow(QMainWindow):
         # Button "Remove", parameters manager menu:
 
         def button_remove_event():
-            #TODO:
-            selected_items = list_parameters.selectedItems()
-            for selected_item in selected_items:
-                list_parameters.removeItemWidget(selected_item)
-                list_parameters.clearSelection()
-                list_parameters.update()
-                button_remove.setDisabled(True)
+            for selected_item in list_parameters.selectedItems():
+                list_parameters.takeItem(list_parameters.row(selected_item))
+            button_remove.setDisabled(True)
 
         button_remove_caption = 'Remove'
         button_remove = create_button(button_caption=button_remove_caption)
@@ -1332,16 +1334,16 @@ class AppWindow(QMainWindow):
         layout_grid.addWidget(button_remove, 4, 0)
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Button "Validate", parameters manager menu:
+        # Button "Edit", parameters manager menu:
 
-        def button_validate_event():
+        def button_edit_event():
             pass
 
-        button_validate_caption = 'Validate'
-        button_validate = create_button(button_caption=button_validate_caption)
-        button_validate.clicked.connect(lambda: button_validate_event())
-        button_validate.setDisabled(True)
-        layout_grid.addWidget(button_validate, 5, 0)
+        button_edit_caption = 'Edit'
+        button_edit = create_button(button_caption=button_edit_caption)
+        button_edit.clicked.connect(lambda: button_edit_event())
+        button_edit.setDisabled(True)
+        layout_grid.addWidget(button_edit, 5, 0)
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Button "Save", parameters manager menu:
@@ -1351,7 +1353,7 @@ class AppWindow(QMainWindow):
 
         button_save_param_caption = 'Save'
         button_save_param = create_button(button_caption=button_save_param_caption)
-        button_save_param.clicked.connect(lambda: button_validate_event())
+        button_save_param.clicked.connect(lambda: button_edit_event())
         button_save_param.setDisabled(True)
         layout_grid.addWidget(button_save_param, 6, 0)
 
