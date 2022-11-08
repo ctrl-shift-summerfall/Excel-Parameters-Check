@@ -949,28 +949,34 @@ class AppWindow(QMainWindow):
                     # Selecting which widgets to show:
                     selected_parameter_type_string = dropdown_new_parameter_type.currentText()
                     selected_parameter_settings_string = {}
+                    selected_parameter_object: ParamCore = None
                     button_shift_row = 0
 
                     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                     # PDR-P settings: 
                     if ParamDuplicateRowsPartial().param_type_code in selected_parameter_type_string:
 
-                        # # Core settings:
-                        # self.param_target_worksheet_name: str = None
-                        # self.param_check_type: str = None
-                        # self.param_check_custom_name: str = None
+                        selected_parameter_object = ParamDuplicateRowsPartial()
                         selected_parameter_settings = {
                             'param_check_type': 'ParamDuplicateRowsPartial',
                             'param_check_custom_name': textbox_new_parameter_name.text(),
-                            'param_target_worksheet_name': dropdown_new_parameter_target_worksheet.currentText()
+                            'param_target_worksheet_name': dropdown_new_parameter_target_worksheet.currentText(),
+                            'param_column_list': [],
+                            'param_column_list_is_range': False,
                             }
-
-                        # # Column list settings:
-                        # self.param_column_list: list or str = None
-                        # self.param_column_list_is_range: bool = None
 
                         button_shift_row = 14
 
+                        def update_selected_parameter_settings():
+                            column_list_string = textbox_pdrp_column_list.text()
+                            column_list_is_range = True
+                            if dropdown_pdrp_column_list_is_range.currentText() == 'False':
+                                 column_list_is_range = False
+                            selected_parameter_settings['param_column_list'] = column_list_string
+                            selected_parameter_settings['param_column_list_is_range'] = column_list_is_range
+
+                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # Columns list input textbox --> "Columns": [__________]
                         label_pdrp_column_list = QLabel()
                         label_pdrp_column_list_text = 'Columns'
                         label_pdrp_column_list.setText(label_pdrp_column_list_text)
@@ -987,6 +993,9 @@ class AppWindow(QMainWindow):
                         layout_grid.addWidget(textbox_pdrp_column_list, 12, 1, 1, 3)
                         new_parameter_settings_widget_list.append(textbox_pdrp_column_list)
 
+                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # Column list is range bool dropdown --> "Is range": [True______] 
+                        #                                                    [False_____]
                         label_pdrp_column_list_is_range = QLabel()
                         label_pdrp_column_list_is_range_text = 'Is range'
                         label_pdrp_column_list_is_range.setText(label_pdrp_column_list_is_range_text)
@@ -1001,6 +1010,9 @@ class AppWindow(QMainWindow):
                         layout_grid.addWidget(dropdown_pdrp_column_list_is_range, 13, 1, 1, 3)
                         new_parameter_settings_widget_list.append(dropdown_pdrp_column_list_is_range)
 
+                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # Button "Check" settings input --> [Check] [Clear] [Add] 
+                        #                                      ^
                         def button_new_settings_check_event():
 
                             # Disabling "Add" button upon next edit:
@@ -1058,6 +1070,7 @@ class AppWindow(QMainWindow):
                                                 column_current_index += 1
                                         column_list = column_list_formatted
 
+                                    # Generating range, if column list is range:
                                     if isinstance(column_list, list):
                                         if column_list_is_range:
                                             column_list_global = Workbook.get_column_list()
@@ -1144,7 +1157,11 @@ class AppWindow(QMainWindow):
 
                     def button_new_settings_add_event():
 
-                        def construct
+                        # Updating parameter settings dictionary:
+                        update_selected_parameter_settings()
+                        selected_parameter_object.setup(**selected_parameter_settings)
+
+                        list_parameters.addItem(selected_parameter_object.param_type_code)
 
                         # Removing widgets:
                         for ui_element in new_parameter_core_widget_list:
