@@ -894,7 +894,18 @@ class AppWindow(QMainWindow):
                 layout_grid.addWidget(dropdown_new_parameter_type, 11, 1, 1, 3)
 
                 def button_new_parameter_core_check_event():
-                    button_new_parameter_continue.setDisabled(False)
+
+                    # Disabling until checked, connecting buttons:
+                    button_new_parameter_continue.setDisabled(True)
+                    textbox_new_parameter_name.textChanged.connect(lambda: button_new_parameter_continue.setDisabled(True))
+
+                    # Checking if name is not empty and is valid:
+                    new_parameter_name = textbox_new_parameter_name.text() 
+                    if len(new_parameter_name) == 0:
+                        button_new_parameter_continue.setDisabled(True)
+                    else:
+                        # TODO: Check if the name is unique
+                        button_new_parameter_continue.setDisabled(False)
 
                 button_new_parameter_check_caption = 'Check'
                 button_new_parameter_check = create_button(button_caption=button_new_parameter_check_caption)
@@ -937,14 +948,26 @@ class AppWindow(QMainWindow):
 
                     # Selecting which widgets to show:
                     selected_parameter_type_string = dropdown_new_parameter_type.currentText()
+                    selected_parameter_settings_string = {}
                     button_shift_row = 0
 
-                    # PDR-P settings widgets:
+                    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    # PDR-P settings: 
                     if ParamDuplicateRowsPartial().param_type_code in selected_parameter_type_string:
 
-                        
-                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                        # PDR-P settings: 
+                        # # Core settings:
+                        # self.param_target_worksheet_name: str = None
+                        # self.param_check_type: str = None
+                        # self.param_check_custom_name: str = None
+                        selected_parameter_settings = {
+                            'param_check_type': 'ParamDuplicateRowsPartial',
+                            'param_check_custom_name': textbox_new_parameter_name.text(),
+                            'param_target_worksheet_name': dropdown_new_parameter_target_worksheet.currentText()
+                            }
+
+                        # # Column list settings:
+                        # self.param_column_list: list or str = None
+                        # self.param_column_list_is_range: bool = None
 
                         button_shift_row = 14
 
@@ -1120,6 +1143,8 @@ class AppWindow(QMainWindow):
                     new_parameter_settings_widget_list.append(button_new_settings_cancel)
 
                     def button_new_settings_add_event():
+
+                        def construct
 
                         # Removing widgets:
                         for ui_element in new_parameter_core_widget_list:
