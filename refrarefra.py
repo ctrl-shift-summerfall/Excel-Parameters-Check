@@ -785,8 +785,8 @@ class AppWindow(QMainWindow):
             button_object = QPushButton()
             button_object.setText(button_caption)
             button_object.setFont(QFont('DengXian', 12))
-            button_width = 96
-            button_height = 36
+            button_width = 110
+            button_height = 40
             button_object.setFixedSize(button_width, button_height)
             return button_object
 
@@ -884,7 +884,12 @@ class AppWindow(QMainWindow):
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # List "Parameters":
 
+        def list_has_selected_items():
+            if len(list_parameters.selectedItems()) > 0: button_remove.setDisabled(False)
+            else: button_remove.setDisabled(True)
+
         list_parameters = QListWidget()
+        list_parameters.itemSelectionChanged.connect(lambda: list_has_selected_items())
         layout_grid.addWidget(list_parameters, 2, 1, 5, 3)
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1080,6 +1085,7 @@ class AppWindow(QMainWindow):
                         dropdown_pdrp_column_list_is_range = QComboBox()
                         dropdown_pdrp_column_list_is_range.setFont((QFont('DengXian', 12)))
                         dropdown_pdrp_column_list_is_range.addItems(('True', 'False'))
+                        dropdown_pdrp_column_list_is_range.currentIndexChanged.connect(lambda: button_new_settings_add.setDisabled(True))
                         layout_grid.addWidget(dropdown_pdrp_column_list_is_range, 13, 1, 1, 3)
                         new_parameter_settings_widget_list.append(dropdown_pdrp_column_list_is_range)
 
@@ -1130,17 +1136,20 @@ class AppWindow(QMainWindow):
                                         column_list_is_range = False
                                     else:
                                         if column_list_is_range:
-                                            column_start, column_end = column_list_formatted
-                                            column_list_global = Workbook.get_column_list()
-                                            column_start_index = column_list_global.index(column_start)
-                                            column_end_index = column_list_global.index(column_end)
-                                            column_current_index = column_start_index
-                                            column_list_formatted = []
-                                            while column_current_index <= column_end_index:
-                                                column = column_list_global[column_current_index]
-                                                if column not in column_list_formatted:
-                                                    column_list_formatted.append(column)
-                                                column_current_index += 1
+                                            try:
+                                                column_start, column_end = column_list_formatted
+                                                column_list_global = Workbook.get_column_list()
+                                                column_start_index = column_list_global.index(column_start)
+                                                column_end_index = column_list_global.index(column_end)
+                                                column_current_index = column_start_index
+                                                column_list_formatted = []
+                                                while column_current_index <= column_end_index:
+                                                    column = column_list_global[column_current_index]
+                                                    if column not in column_list_formatted:
+                                                        column_list_formatted.append(column)
+                                                    column_current_index += 1
+                                            except:
+                                                column_list_formatted = None
                                         column_list = column_list_formatted
 
                                     # Generating range, if column list is range:
@@ -1308,7 +1317,13 @@ class AppWindow(QMainWindow):
         # Button "Remove", parameters manager menu:
 
         def button_remove_event():
-            pass
+            #TODO:
+            selected_items = list_parameters.selectedItems()
+            for selected_item in selected_items:
+                list_parameters.removeItemWidget(selected_item)
+                list_parameters.clearSelection()
+                list_parameters.update()
+                button_remove.setDisabled(True)
 
         button_remove_caption = 'Remove'
         button_remove = create_button(button_caption=button_remove_caption)
