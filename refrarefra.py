@@ -11,15 +11,12 @@ import openpyxl
 # Typing and classes import list:
 from dataclasses import asdict, dataclass
 from typing import Any
+import re
 
 # PyQt6 Interface import list:
 from PyQt6.QtWidgets import *
 from PyQt6.QtGui import QFont
 from PyQt6 import QtCore
-
-
-
-
 
 
 @dataclass(frozen=True, order=True)
@@ -249,7 +246,7 @@ class ParamCore:
 
     @property
     def display(self):
-        display_string = '"{param_name}" {param_type_code} ({param_info}) @{param_target_worksheet}'.format(
+        display_string = '\"{param_name}\" {param_type_code} ({param_info}) @{param_target_worksheet}'.format(
             param_name=self.param_check_custom_name,
             param_type_code=self.param_type_code,
             param_info=self._result_info,
@@ -338,6 +335,7 @@ class ParamCore:
         # Getting default values:
         self.param_flag_header_name = self.param_flag_header_name_default
         self.param_flag_value = self.param_flag_value_default
+        self.param_highlight_cell = False
         self.param_highlight_cell_hue = self.param_highlight_cell_hue_default
 
         # Setting up values according to settings inputs:
@@ -778,6 +776,7 @@ class AppWindow(QMainWindow):
         self.app_layout: Any = None
 
         self.parameters_list = []
+
     
     def setup(self):
 
@@ -988,8 +987,13 @@ class AppWindow(QMainWindow):
                     if len(new_parameter_name) == 0:
                         button_new_parameter_continue.setDisabled(True)
                     else:
-                        # TODO: Check if the name is unique
-                        button_new_parameter_continue.setDisabled(False)
+                        for parameter_object in self.parameters_list:
+                            parameter_object_name = parameter_object.param_check_custom_name
+                            if new_parameter_name == parameter_object_name:
+                                button_new_parameter_continue.setDisabled(True)
+                                break
+                        else:
+                            button_new_parameter_continue.setDisabled(False)
 
                 button_new_parameter_check_caption = 'Check'
                 button_new_parameter_check = create_button(button_caption=button_new_parameter_check_caption)
@@ -1107,6 +1111,11 @@ class AppWindow(QMainWindow):
                             input_is_valid = True
                             input_has_invalid_character = False
                             input_string = textbox_pdrp_column_list.text().upper()
+                            
+                            if len(input_string) > 0:
+                                while input_string[-1] in (',', ' '):
+                                    input_string = input_string[:-1]
+                            
                             if len(input_string) == 0:
                                 input_is_valid = False 
                             else:
@@ -1248,8 +1257,10 @@ class AppWindow(QMainWindow):
                         # Updating parameter settings dictionary:
                         update_selected_parameter_settings()
                         selected_parameter_object.setup(**selected_parameter_settings)
+                        selected_parameter_object._validate()
 
                         list_parameters.addItem(selected_parameter_object.display)
+                        self.parameters_list.append(selected_parameter_object)
                         pprint(selected_parameter_object.__dict__)
 
                         # Removing widgets:
@@ -1273,7 +1284,7 @@ class AppWindow(QMainWindow):
                     button_new_settings_add.setDisabled(True)
                     layout_grid.addWidget(button_new_settings_add, button_shift_row, 3)
                     new_parameter_settings_widget_list.append(button_new_settings_add)
-                    
+
                 button_new_parameter_continue_caption = 'Continue'
                 button_new_parameter_continue = create_button(button_caption=button_new_parameter_continue_caption)
                 button_new_parameter_continue.clicked.connect(lambda: button_new_parameter_core_continue_event())
@@ -1324,7 +1335,26 @@ class AppWindow(QMainWindow):
 
         def button_remove_event():
             for selected_item in list_parameters.selectedItems():
+
+                # Removing from active parameters list:
+                selected_parameter_string = list_parameters.currentItem().text()
+                selected_parameter_name_pattern: str = '\"(\w+)\"'
+                selected_parameter_name = re.findall(pattern=selected_parameter_name_pattern, 
+                                                    string=selected_parameter_string)[0]
+                selected_parameter: ParamCore = None
+                for parameter_object in self.parameters_list:
+                    parameter_object_name = parameter_object.param_check_custom_name
+                    if parameter_object_name == selected_parameter_name:
+                        selected_parameter = parameter_object
+                        break
+                
+                if selected_parameter in self.parameters_list:
+                    self.parameters_list.remove(selected_parameter)
+                    print(selected_parameter)
+                
+                # Removing from display:
                 list_parameters.takeItem(list_parameters.row(selected_item))
+
             button_remove.setDisabled(True)
 
         button_remove_caption = 'Remove'
@@ -1334,10 +1364,38 @@ class AppWindow(QMainWindow):
         layout_grid.addWidget(button_remove, 4, 0)
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Button "Edit", parameters manager menu:
+        # Button "Edit", parametesdrs manager menu:
 
         def button_edit_event():
-            pass
+            selected_parameter_string = list_parameters.currentItem().text()
+            selected_parameter_name_pattern: str = '\"(\w+)\"'
+            selected_parameter_name = re.findall(pattern=selected_parameter_name_pattern, 
+                                                 string=selected_parameter_string)[0]
+            selected_parameter: ParamCore = None
+            for parameter_object in self.parameters_list:
+                parameter_object_name = parameter_object.param_check_custom_name
+                if parameter_object_name == selected_parameter_name:
+                    selected_parameter = parameter_object
+                    break
+            
+            label_edit_parameter = QLabel()
+            label_edit_parameter_text = f'Add new parameter check'
+            label_edit_parameter.setText(label_edit_parameter_text)
+            label_edit_parameter.setFont(QFont('DengXian', 12))
+            label_edit_parameter.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            layout_grid.addWidget(label_edit_parameter, 8, 0, 1, 4)
+
+            label_edit_parameter_target_worksheet = QLabel()
+            label_edit_parameter_target_worksheet_text = 'Worksheet'
+            label_edit_parameter_target_worksheet.setText(label_edit_parameter_target_worksheet_text)
+            label_edit_parameter_target_worksheet.setFont(QFont('DengXian', 12))
+            label_edit_parameter_target_worksheet.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+            layout_grid.addWidget(label_edit_parameter_target_worksheet, 9, 0)
+
+            dropdown_edit_parameter_target_worksheet = QComboBox()
+            dropdown_edit_parameter_target_worksheet.setFont(QFont('DengXian', 12))
+            dropdown_edit_parameter_target_worksheet.addItems(self.app_workbook._active_workbook_worksheet_list)
+            layout_grid.addWidget(dropdown_edit_parameter_target_worksheet, 9, 1, 1, 3)
 
         button_edit_caption = 'Edit'
         button_edit = create_button(button_caption=button_edit_caption)
@@ -1366,6 +1424,24 @@ class AppWindow(QMainWindow):
         label_parameters.setFont(QFont('DengXian', 12))
         label_parameters.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         layout_grid.addWidget(label_parameters, 7, 0, 1, 4)
+
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Separator:
+        
+        final_row = 15
+        for row in range(7, final_row):
+            label_parameters = QLabel()
+            label_parameters_text = f''
+            label_parameters.setText(label_parameters_text)
+            label_parameters.setFont(QFont('DengXian', 12))
+            label_parameters.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            layout_grid.addWidget(label_parameters, row, 0, 1, 4)
+        label_parameters = QLabel()
+        label_parameters_text = f''
+        label_parameters.setText(label_parameters_text)
+        label_parameters.setFont(QFont('DengXian', 12))
+        label_parameters.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        layout_grid.addWidget(label_parameters, final_row, 0, 1, 4)
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Add new parameter settings widget list:
