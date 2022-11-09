@@ -182,9 +182,6 @@ class Workbook:
                 parameter_pair_list = read_parameter_string(parameter_string)
                 parameter_list.append(parameter_pair_list)
         
-        import pprint
-        pprint.pprint(parameter_list)
-
     def get_cell(self, cell_position: str):
         cell_value = self.read_cell(cell_position)
         cell_object = Cell(position=cell_position, value=cell_value)
@@ -1350,7 +1347,6 @@ class AppWindow(QMainWindow):
                 
                 if selected_parameter in self.parameters_list:
                     self.parameters_list.remove(selected_parameter)
-                    print(selected_parameter)
                 
                 # Removing from display:
                 list_parameters.takeItem(list_parameters.row(selected_item))
@@ -1379,7 +1375,7 @@ class AppWindow(QMainWindow):
                     break
             
             label_edit_parameter = QLabel()
-            label_edit_parameter_text = f'Add new parameter check'
+            label_edit_parameter_text = f'Edit target worksheet'
             label_edit_parameter.setText(label_edit_parameter_text)
             label_edit_parameter.setFont(QFont('DengXian', 12))
             label_edit_parameter.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
@@ -1396,6 +1392,25 @@ class AppWindow(QMainWindow):
             dropdown_edit_parameter_target_worksheet.setFont(QFont('DengXian', 12))
             dropdown_edit_parameter_target_worksheet.addItems(self.app_workbook._active_workbook_worksheet_list)
             layout_grid.addWidget(dropdown_edit_parameter_target_worksheet, 9, 1, 1, 3)
+
+            def button_save_edit_event():
+
+                # Removing edit tab widgets:
+                for widget in edit_widget_list:
+                    widget.setVisible(False)
+                    layout_grid.removeWidget(widget)
+
+            button_save_edit_caption = 'Save'
+            button_save_edit = create_button(button_caption=button_save_edit_caption)
+            button_save_edit.clicked.connect(lambda: button_save_edit_event())
+            button_save_edit.setDisabled(False)
+            layout_grid.addWidget(button_save_edit, 10, 3)
+
+            edit_widget_list = [
+                label_edit_parameter,
+                label_edit_parameter_target_worksheet, 
+                dropdown_edit_parameter_target_worksheet,
+                button_save_edit]
 
         button_edit_caption = 'Edit'
         button_edit = create_button(button_caption=button_edit_caption)
@@ -1437,7 +1452,7 @@ class AppWindow(QMainWindow):
             label_parameters.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             layout_grid.addWidget(label_parameters, row, 0, 1, 4)
         label_parameters = QLabel()
-        label_parameters_text = f''
+        label_parameters_text = f'。'
         label_parameters.setText(label_parameters_text)
         label_parameters.setFont(QFont('DengXian', 12))
         label_parameters.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
