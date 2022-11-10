@@ -1441,7 +1441,7 @@ class AppWindow(QMainWindow):
         layout_grid.addWidget(label_parameters, 7, 0, 1, 4)
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Separator:
+        # End separator:
         
         final_row = 15
         for row in range(7, final_row):
