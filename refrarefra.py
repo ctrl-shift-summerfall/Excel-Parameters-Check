@@ -49,6 +49,8 @@ class Workbook:
         self._active_worksheet: openpyxl.Workbook[str] = None
         self._active_worksheet_name: str = None
 
+        self._reserved_row: int = 2
+
         
     @classmethod
     def get_column_list(self):
@@ -194,6 +196,24 @@ class Workbook:
     def write_cell(self, cell_position: str, write_value: Any):
         self._active_worksheet[cell_position] = write_value
 
+    def get_header_column(self, target_worksheet_name: str, header_value: str):
+
+        # Switching worksheets:
+        self.switch_worksheet(target_worksheet_name)
+
+        # Getting all columns:
+        column_list = self.get_column_list()
+
+        # Reading headers:
+        row: int = self._reserved_row
+        for column in column_list:
+            cell_header = f'{column}{row}'
+            cell_header_value = self.read_cell(cell_header)
+            if cell_header_value == header_value:
+                return column
+            elif cell_header_value is None:
+                return column
+
 
 @dataclass(frozen=True, order=True)
 class ParamResult:
@@ -228,7 +248,7 @@ class ParamCore:
         self.param_flag_header_col: str = None
         self.param_flag_value: str = None
         self.param_flag_value_default: str = None
-        self.param_flag_required: bool = False
+        self.param_flag_required: bool = True
 
         self._validated: bool = False
         self._ready: bool = False
@@ -243,10 +263,10 @@ class ParamCore:
 
     @property
     def display(self):
-        display_string = '\"{param_name}\" {param_type_code} ({param_info}) @{param_target_worksheet}'.format(
+        display_string = '\"{param_name}\" {param_type_code} {param_info}@{param_target_worksheet}'.format(
             param_name=self.param_check_custom_name,
             param_type_code=self.param_type_code,
-            param_info=self._result_info,
+            param_info=f'({self._result_info}) ' if self._result_info is not None else '',
             param_target_worksheet=self.param_target_worksheet_name,
             )
         return display_string
@@ -329,17 +349,17 @@ class ParamCore:
 
     def setup(self, **param_settings):
 
-        # Getting default values:
-        self.param_flag_header_name = self.param_flag_header_name_default
-        self.param_flag_value = self.param_flag_value_default
-        self.param_highlight_cell = False
-        self.param_highlight_cell_hue = self.param_highlight_cell_hue_default
-
         # Setting up values according to settings inputs:
         self.__dict__.update(param_settings)
         self.param_highlight_cell_pattern = PatternFill(fill_type='solid',
                                                         start_color=self.param_highlight_cell_hue,
                                                         end_color=self.param_highlight_cell_hue)
+        
+        self.param_flag_header_name = self.param_flag_header_name_default
+        self.param_flag_value = self.param_flag_value_default
+        self.param_highlight_cell = False
+        self.param_highlight_cell_hue = self.param_highlight_cell_hue_default
+    
 
 class ParamDuplicateRows(ParamCore):
 
@@ -811,8 +831,12 @@ class AppWindow(QMainWindow):
                 button_close.setDisabled(False)
 
                 # Updating parameter manager buttons status:
-                button_read.setDisabled(False)
                 button_add.setDisabled(False)
+
+                # Checking if workbook contains P_LIST worksheet, enabling read option:
+                default_param_worksheet_name = self.app_workbook._default_worksheet_name_param
+                if default_param_worksheet_name in self.app_workbook._active_workbook_worksheet_list:
+                    button_read.setDisabled(False)
             
         button_open_caption = 'Open'
         button_open = create_button(button_caption=button_open_caption)
@@ -900,7 +924,8 @@ class AppWindow(QMainWindow):
         def button_read_event():
             
             # Reading parameter setups from P_LIST in workbook:
-            self.app_workbook.read_parameter_worksheet()
+            
+                self.app_workbook.read_parameter_worksheet()
 
         button_read_caption = 'Read'
         button_read = create_button(button_caption=button_read_caption)
@@ -1031,16 +1056,18 @@ class AppWindow(QMainWindow):
                         if ui_element_set_disabled:
                             ui_element.setDisabled(True)
 
-                    # Selecting which widgets to show:
+                    # Empty function placeholders:
                     selected_parameter_type_string = dropdown_new_parameter_type.currentText()
                     selected_parameter_settings_string = {}
                     selected_parameter_object: ParamCore = None
                     button_shift_row = 0
+                    def update_selected_parameter_settings(): pass
 
                     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                     # PDR-P settings: 
                     if ParamDuplicateRowsPartial().param_type_code in selected_parameter_type_string:
 
+                        # Preconstructing settings:
                         selected_parameter_object = ParamDuplicateRowsPartial()
                         selected_parameter_settings = {
                             'param_check_type': 'ParamDuplicateRowsPartial',
@@ -1198,11 +1225,172 @@ class AppWindow(QMainWindow):
 
                     # PDR settings widgets:
                     elif ParamDuplicateRows().param_type_code in selected_parameter_type_string:
-                        pass
+                        selected_parameter_object = ParamDuplicateRows()
+                        selected_parameter_settings = {
+                            'param_check_type': 'ParamDuplicateRows',
+                            'param_check_custom_name': textbox_new_parameter_name.text(),
+                            'param_target_worksheet_name': dropdown_new_parameter_target_worksheet.currentText(),
+                            }
+                        button_shift_row = 12
 
                     # PEC settings widgets:
                     elif ParamEmptyCells().param_type_code in selected_parameter_type_string:
-                        pass
+                        
+                        button_shift_row = 14
+
+                        # Preconstructing settings:
+                        selected_parameter_object = ParamEmptyCells()
+                        selected_parameter_settings = {
+                            'param_check_type': 'ParamEmptyCells',
+                            'param_check_custom_name': textbox_new_parameter_name.text(),
+                            'param_target_worksheet_name': dropdown_new_parameter_target_worksheet.currentText(),
+                            'param_column_list': [],
+                            'param_column_list_is_range': False,
+                            }
+
+                        def update_selected_parameter_settings():
+                            column_list_string = textbox_pdrp_column_list.text()
+                            column_list_is_range = True
+                            if dropdown_pdrp_column_list_is_range.currentText() == 'False':
+                                 column_list_is_range = False
+                            selected_parameter_settings['param_column_list'] = column_list_string
+                            selected_parameter_settings['param_column_list_is_range'] = column_list_is_range
+
+                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # Columns list input textbox --> "Columns": [__________]
+                        label_pdrp_column_list = QLabel()
+                        label_pdrp_column_list_text = 'Columns'
+                        label_pdrp_column_list.setText(label_pdrp_column_list_text)
+                        label_pdrp_column_list.setFont(QFont('DengXian', 12))
+                        label_pdrp_column_list.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        layout_grid.addWidget(label_pdrp_column_list, 12, 0)
+                        new_parameter_settings_widget_list.append(label_pdrp_column_list)
+
+                        textbox_pdrp_column_list = QLineEdit()
+                        textbox_pdrp_column_list_text = ''
+                        textbox_pdrp_column_list.setText(textbox_pdrp_column_list_text)
+                        textbox_pdrp_column_list.setFont(QFont('DengXian', 12))
+                        textbox_pdrp_column_list.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        layout_grid.addWidget(textbox_pdrp_column_list, 12, 1, 1, 3)
+                        new_parameter_settings_widget_list.append(textbox_pdrp_column_list)
+
+                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # Column list is range bool dropdown --> "Is range": [True______] 
+                        #                                                    [False_____]
+                        label_pdrp_column_list_is_range = QLabel()
+                        label_pdrp_column_list_is_range_text = 'Is range'
+                        label_pdrp_column_list_is_range.setText(label_pdrp_column_list_is_range_text)
+                        label_pdrp_column_list_is_range.setFont(QFont('DengXian', 12))
+                        label_pdrp_column_list_is_range.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        layout_grid.addWidget(label_pdrp_column_list_is_range, 13, 0)
+                        new_parameter_settings_widget_list.append(label_pdrp_column_list_is_range)
+
+                        dropdown_pdrp_column_list_is_range = QComboBox()
+                        dropdown_pdrp_column_list_is_range.setFont((QFont('DengXian', 12)))
+                        dropdown_pdrp_column_list_is_range.addItems(('True', 'False'))
+                        dropdown_pdrp_column_list_is_range.currentIndexChanged.connect(lambda: button_new_settings_add.setDisabled(True))
+                        layout_grid.addWidget(dropdown_pdrp_column_list_is_range, 13, 1, 1, 3)
+                        new_parameter_settings_widget_list.append(dropdown_pdrp_column_list_is_range)
+
+                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # Button "Check" settings input --> [Check] [Clear] [Add] 
+                        #                                      ^
+                        def button_new_settings_check_event():
+
+                            # Disabling "Add" button upon next edit:
+                            textbox_pdrp_column_list.textChanged.connect(lambda: button_new_settings_add.setDisabled(True))
+
+                            # Checking input and enabling "Add" button if input is valid::
+                            input_is_valid = True
+                            input_has_invalid_character = False
+                            input_string = textbox_pdrp_column_list.text().upper()
+                            
+                            if len(input_string) > 0:
+                                while input_string[-1] in (',', ' '):
+                                    input_string = input_string[:-1]
+                            
+                            if len(input_string) == 0:
+                                input_is_valid = False 
+                            else:
+
+                                # Checking invalid character input:
+                                input_string_test = input_string.replace(',', '')
+                                if len(input_string_test) == 0:
+                                    input_is_valid = False
+                                character_list_invalid = '1234567890!@#$%^&*()_+-=[]{}\|\\;\'\:\"./<>?~'
+                                character_list_valid = ',abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                                for character in character_list_invalid:
+                                    if character in input_string:
+                                        input_has_invalid_character = True
+                                        input_is_valid = False
+                                for character in input_string:
+                                    if character not in character_list_valid:
+                                        input_has_invalid_character = True
+                                        input_is_valid = False
+
+                                if not input_has_invalid_character:
+                                    column_list_is_range = False
+                                    if dropdown_pdrp_column_list_is_range.currentText() == 'True':
+                                        column_list_is_range = True
+                    
+                                    # Generating column list:
+                                    column_list_str = str(input_string).replace(' ', '')
+                                    if column_list_str[-1] == ',':
+                                        column_list_str = column_list_str[0:-1]
+                                    column_list_formatted = column_list_str.split(',')
+                                    column_list = []
+                                    if len(column_list_formatted) == 1:
+                                        dropdown_pdrp_column_list_is_range.setCurrentIndex(1)
+                                        column_list_is_range = False
+                                    else:
+                                        if column_list_is_range:
+                                            try:
+                                                column_start, column_end = column_list_formatted
+                                                column_list_global = Workbook.get_column_list()
+                                                column_start_index = column_list_global.index(column_start)
+                                                column_end_index = column_list_global.index(column_end)
+                                                column_current_index = column_start_index
+                                                column_list_formatted = []
+                                                while column_current_index <= column_end_index:
+                                                    column = column_list_global[column_current_index]
+                                                    if column not in column_list_formatted:
+                                                        column_list_formatted.append(column)
+                                                    column_current_index += 1
+                                            except:
+                                                column_list_formatted = None
+                                        column_list = column_list_formatted
+
+                                    # Generating range, if column list is range:
+                                    if isinstance(column_list, list):
+                                        if column_list_is_range:
+                                            column_list_global = Workbook.get_column_list()
+                                            column_start = column_list[0]
+                                            column_end = column_list[-1]
+                                            if column_start == column_end:
+                                                dropdown_pdrp_column_list_is_range.setCurrentIndex(1)
+                                                column_list_is_range = False
+                                            else:
+                                                column_start_index = column_list_global.index(column_start)
+                                                column_end_index = column_list_global.index(column_end)
+                                                column_index_difference = int((column_end_index + 1) - column_start_index)
+                                                column_count = len(column_list)
+                                                if column_index_difference != column_count:
+                                                    input_is_valid = False
+                                    else:
+                                        input_is_valid = False 
+                            
+                            if input_is_valid:
+                                textbox_pdrp_column_list.setText(input_string.upper())
+                                button_new_settings_add.setDisabled(False)
+                            else:
+                                button_new_settings_add.setDisabled(True)
+
+                        button_new_settings_check_caption = 'Check'
+                        button_new_settings_check = create_button(button_caption=button_new_settings_check_caption)
+                        button_new_settings_check.clicked.connect(lambda: button_new_settings_check_event())
+                        button_new_settings_check.setDisabled(False)
+                        layout_grid.addWidget(button_new_settings_check, button_shift_row, 1)
+                        new_parameter_settings_widget_list.append(button_new_settings_check)
 
                     # PCF settings widgets:
                     elif ParamCompareFlats().param_type_code in selected_parameter_type_string:
@@ -1223,8 +1411,9 @@ class AppWindow(QMainWindow):
                             ui_element.setVisible(False)
                             layout_grid.removeWidget(ui_element)
 
-                    # Adding new buttons:
-
+                    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    # Button "Cancel" settings input --> [Check] [Cancel] [Add] 
+                    #                                                ^
                     def button_new_settings_cancel_event():
                         
                         # Removing widgets:
@@ -1249,11 +1438,22 @@ class AppWindow(QMainWindow):
                     layout_grid.addWidget(button_new_settings_cancel, button_shift_row, 2)
                     new_parameter_settings_widget_list.append(button_new_settings_cancel)
 
+                    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    # Button "Cancel" settings input --> [Check] [Cancel] [Add] 
+                    #                                                       ^
                     def button_new_settings_add_event():
 
                         # Updating parameter settings dictionary:
                         update_selected_parameter_settings()
                         selected_parameter_object.setup(**selected_parameter_settings)
+
+                        # Getting header column:
+                        target_worksheet: str = dropdown_new_parameter_target_worksheet.currentText()
+                        header_value: str = selected_parameter_object.param_flag_header_name
+                        header_column: str = self.app_workbook.get_header_column(target_worksheet, header_value)
+                        selected_parameter_object.param_flag_header_col = header_column
+
+                        # Validating:
                         selected_parameter_object._validate()
 
                         list_parameters.addItem(selected_parameter_object.display)
@@ -1263,9 +1463,11 @@ class AppWindow(QMainWindow):
                         # Removing widgets:
                         for ui_element in new_parameter_core_widget_list:
                             ui_element.setVisible(False)
+                            ui_element.setEnabled(False)
                             layout_grid.removeWidget(ui_element)
                         for ui_element in new_parameter_settings_widget_list:
                             ui_element.setVisible(False)
+                            ui_element.setEnabled(False)
                             layout_grid.removeWidget(ui_element)
 
                         # Re-enabling buttons:
@@ -1278,9 +1480,14 @@ class AppWindow(QMainWindow):
                     button_new_settings_add_caption = 'Add'
                     button_new_settings_add = create_button(button_caption=button_new_settings_add_caption)
                     button_new_settings_add.clicked.connect(lambda: button_new_settings_add_event())
-                    button_new_settings_add.setDisabled(True)
+                    button_new_settings_add.setEnabled(False)
                     layout_grid.addWidget(button_new_settings_add, button_shift_row, 3)
                     new_parameter_settings_widget_list.append(button_new_settings_add)
+
+                    # Bypassing setEnabled(False), if type is PDR:
+                    if ParamDuplicateRows().param_type_code in selected_parameter_type_string:
+                        if ParamDuplicateRowsPartial().param_type_code not in selected_parameter_type_string:
+                            button_new_settings_add.setEnabled(True)
 
                 button_new_parameter_continue_caption = 'Continue'
                 button_new_parameter_continue = create_button(button_caption=button_new_parameter_continue_caption)
@@ -1337,7 +1544,7 @@ class AppWindow(QMainWindow):
                 selected_parameter_string = list_parameters.currentItem().text()
                 selected_parameter_name_pattern: str = '\"(\w+)\"'
                 selected_parameter_name = re.findall(pattern=selected_parameter_name_pattern, 
-                                                    string=selected_parameter_string)[0]
+                                                     string=selected_parameter_string)[0]
                 selected_parameter: ParamCore = None
                 for parameter_object in self.parameters_list:
                     parameter_object_name = parameter_object.param_check_custom_name
@@ -1400,6 +1607,16 @@ class AppWindow(QMainWindow):
                     widget.setVisible(False)
                     layout_grid.removeWidget(widget)
 
+                # Removing changed element from the list:
+                selected_item = list_parameters.currentItem()
+                list_parameters.takeItem(list_parameters.row(selected_item))
+
+                # Adding new element to the list:
+                new_target_worksheet_name = dropdown_edit_parameter_target_worksheet.currentText()
+                selected_parameter.param_target_worksheet_name = new_target_worksheet_name
+                selected_parameter_display = selected_parameter.display
+                list_parameters.addItem(selected_parameter_display)
+
             button_save_edit_caption = 'Save'
             button_save_edit = create_button(button_caption=button_save_edit_caption)
             button_save_edit.clicked.connect(lambda: button_save_edit_event())
@@ -1411,7 +1628,7 @@ class AppWindow(QMainWindow):
                 label_edit_parameter_target_worksheet, 
                 dropdown_edit_parameter_target_worksheet,
                 button_save_edit]
-
+            
         button_edit_caption = 'Edit'
         button_edit = create_button(button_caption=button_edit_caption)
         button_edit.clicked.connect(lambda: button_edit_event())
