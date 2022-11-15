@@ -643,12 +643,6 @@ class ParamCompareFlats(ParamCore):
                     column_list_formatted.append(column)
                 column_current_index += 1
         self.param_column_list = column_list_formatted
-
-        # Generating operators:
-        compare_operator = '>' if self.param_compare_axis else '<'
-        if self.param_compare_axis_inclusive:
-            compare_operator += '='
-        self.param_compare_operator = compare_operator
             
         # Updating result info string line:
         column_list_str_res = ''
@@ -663,8 +657,11 @@ class ParamCompareFlats(ParamCore):
                     column_list_str_res = f'{column}'
                 else:
                     column_list_str_res = f'{column_list_str_res}, {column}'
-        result_info_str = f'{column_list_str_res}'
-        self._result_info = result_info_str
+        result_info_precon = '{column_range} & {operator}{value}'.format(
+            column_range=column_list_str_res,
+            operator=self.param_compare_operator,
+            value=self.param_compare_value)
+        self._result_info = result_info_precon
         
         # Finalizing: 
         self._validate()
@@ -730,53 +727,6 @@ class ParamCompareSums(ParamCore):
 class ParamCompareTime(ParamCore):
     pass
  
-
-p = ParamCompareSums()
-
-param_settings_list = (
-    'param_target_worksheet_name',                      # str:              "MSK_1"
-    'param_check_type',                                 # str:              "Parameter_Check_Duplicate_Row"
-    'param_check_custom_name',                          # str:              "Custom name"
-    'param_highlight_cell',                             # bool:             True
-    'param_highlight_cell_hue',                         # str:              "0000FF00"
-    'param_highlight_cell_pattern',                     # PatternFill:      PatternFill(**kwargs)
-    'param_flag_required',                              # bool:             True
-    'param_flag_header_name',                           # str:              "Parameter_Check_Duplicate_Row"
-    'param_flag_header_col',                            # str:              "K"
-    'param_flag_value',                                 # str:              "Duplicate_Row"
-
-    'param_column_list',                                # list or str:      ['A', 'C']
-    'param_column_list_is_range',                       # bool:             True
-
-    'param_compare_value',                              # float:            200.00
-    'param_compare_axis',                               # str:              "more"
-    'param_compare_axis_inclusive'                      # bool:             True
-    )
-
-# p.setup(
-#     param_target_worksheet_name='MSK_1',
-#     param_check_type='@',
-#     param_check_custom_name='Custom name',
-#     param_highlight_cell=True,
-#     param_highlight_cell_hue='0000FF00',
-#     param_highlight_cell_pattern=PatternFill(),
-#     param_flag_required=True,
-#     param_flag_header_name='@',
-#     param_flag_header_col='K',
-#     param_flag_value='@',
-
-#     param_column_list='A, C, D',
-#     param_column_list_is_range=False,
-
-#     param_compare_value=200.00,
-#     param_compare_axis='more',
-#     param_compare_axis_inclusive=True
-# )
-
-# import pprint as pp
-# pp.pprint(p.__dict__, indent=4, compact=True)
-# print(p.validated)
-
 
 @dataclass(frozen=True, order=True)
 class ParamListed:
@@ -1087,6 +1037,48 @@ class AppWindow(QMainWindow):
                             selected_parameter_settings['param_column_list'] = column_list_string
                             selected_parameter_settings['param_column_list_is_range'] = column_list_is_range
 
+                        def check_column_input():
+                            input_string = textbox_pdrp_column_list.text()
+                            valid_characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                            valid_separator = ','
+                            if input_string == '':
+                                pass
+                            else:
+                                if len(input_string) == 1:
+                                    if input_string[0] not in valid_characters: input_string = ''
+                                    elif input_string[0] == valid_separator: input_string = ''
+                                else:
+                                    if input_string[-1] == valid_separator:
+                                        if input_string[-2] == valid_separator:
+                                            input_string = input_string[:-1]
+                                    elif input_string[-1] not in valid_characters:
+                                        input_string = input_string[:-1]
+
+                            prev_input = ''
+                            for character in input_string:
+                                if character == valid_separator:
+                                    if len(prev_input) in (1, 2):
+                                        prev_input = ''
+                                    else:
+                                        prev_input += character
+                                        remove_index = len(prev_input) * -1
+                                        input_string = input_string[:remove_index]
+                                        prev_input = ''
+                                        break
+                                else:
+                                    prev_input += character
+                                    if len(prev_input) > 2:
+                                        remove_index = len(prev_input) * -1
+                                        input_string = input_string[:remove_index]
+                                        prev_input = ''
+                                        break
+
+                            textbox_pdrp_column_list.setText(input_string)
+                            button_new_settings_add.setEnabled(False)
+
+                            if input_string.count(',') > 1:
+                                dropdown_pdrp_column_list_is_range.setCurrentIndex(1)
+
                         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                         # Columns list input textbox --> "Columns": [__________]
                         label_pdrp_column_list = QLabel()
@@ -1102,6 +1094,7 @@ class AppWindow(QMainWindow):
                         textbox_pdrp_column_list.setText(textbox_pdrp_column_list_text)
                         textbox_pdrp_column_list.setFont(QFont('DengXian', 12))
                         textbox_pdrp_column_list.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        textbox_pdrp_column_list.textChanged.connect(lambda: check_column_input())
                         layout_grid.addWidget(textbox_pdrp_column_list, 12, 1, 1, 3)
                         new_parameter_settings_widget_list.append(textbox_pdrp_column_list)
 
@@ -1249,48 +1242,91 @@ class AppWindow(QMainWindow):
                             }
 
                         def update_selected_parameter_settings():
-                            column_list_string = textbox_pdrp_column_list.text()
+                            column_list_string = textbox_pec_column_list.text()
                             column_list_is_range = True
-                            if dropdown_pdrp_column_list_is_range.currentText() == 'False':
+                            if dropdown_pec_column_list_is_range.currentText() == 'False':
                                  column_list_is_range = False
                             selected_parameter_settings['param_column_list'] = column_list_string
                             selected_parameter_settings['param_column_list_is_range'] = column_list_is_range
 
+                        def check_column_input():
+                            input_string = textbox_pec_column_list.text()
+                            valid_characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                            valid_separator = ','
+                            if input_string == '':
+                                pass
+                            else:
+                                if len(input_string) == 1:
+                                    if input_string[0] not in valid_characters: input_string = ''
+                                    elif input_string[0] == valid_separator: input_string = ''
+                                else:
+                                    if input_string[-1] == valid_separator:
+                                        if input_string[-2] == valid_separator:
+                                            input_string = input_string[:-1]
+                                    elif input_string[-1] not in valid_characters:
+                                        input_string = input_string[:-1]
+
+                            prev_input = ''
+                            for character in input_string:
+                                if character == valid_separator:
+                                    if len(prev_input) in (1, 2):
+                                        prev_input = ''
+                                    else:
+                                        prev_input += character
+                                        remove_index = len(prev_input) * -1
+                                        input_string = input_string[:remove_index]
+                                        prev_input = ''
+                                        break
+                                else:
+                                    prev_input += character
+                                    if len(prev_input) > 2:
+                                        remove_index = len(prev_input) * -1
+                                        input_string = input_string[:remove_index]
+                                        prev_input = ''
+                                        break
+
+                            textbox_pec_column_list.setText(input_string)
+                            button_new_settings_add.setEnabled(False)
+
+                            if input_string.count(',') > 1:
+                                dropdown_pec_column_list_is_range.setCurrentIndex(1)
+
                         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                         # Columns list input textbox --> "Columns": [__________]
-                        label_pdrp_column_list = QLabel()
-                        label_pdrp_column_list_text = 'Columns'
-                        label_pdrp_column_list.setText(label_pdrp_column_list_text)
-                        label_pdrp_column_list.setFont(QFont('DengXian', 12))
-                        label_pdrp_column_list.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
-                        layout_grid.addWidget(label_pdrp_column_list, 12, 0)
-                        new_parameter_settings_widget_list.append(label_pdrp_column_list)
+                        label_pec_column_list = QLabel()
+                        label_pec_column_list_text = 'Columns'
+                        label_pec_column_list.setText(label_pec_column_list_text)
+                        label_pec_column_list.setFont(QFont('DengXian', 12))
+                        label_pec_column_list.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        layout_grid.addWidget(label_pec_column_list, 12, 0)
+                        new_parameter_settings_widget_list.append(label_pec_column_list)
 
-                        textbox_pdrp_column_list = QLineEdit()
-                        textbox_pdrp_column_list_text = ''
-                        textbox_pdrp_column_list.setText(textbox_pdrp_column_list_text)
-                        textbox_pdrp_column_list.setFont(QFont('DengXian', 12))
-                        textbox_pdrp_column_list.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
-                        layout_grid.addWidget(textbox_pdrp_column_list, 12, 1, 1, 3)
-                        new_parameter_settings_widget_list.append(textbox_pdrp_column_list)
+                        textbox_pec_column_list = QLineEdit()
+                        textbox_pec_column_list_text = ''
+                        textbox_pec_column_list.setText(textbox_pec_column_list_text)
+                        textbox_pec_column_list.setFont(QFont('DengXian', 12))
+                        textbox_pec_column_list.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        textbox_pec_column_list.textChanged.connect(lambda: check_column_input())
+                        layout_grid.addWidget(textbox_pec_column_list, 12, 1, 1, 3)
+                        new_parameter_settings_widget_list.append(textbox_pec_column_list)
 
                         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                         # Column list is range bool dropdown --> "Is range": [True______] 
                         #                                                    [False_____]
-                        label_pdrp_column_list_is_range = QLabel()
-                        label_pdrp_column_list_is_range_text = 'Is range'
-                        label_pdrp_column_list_is_range.setText(label_pdrp_column_list_is_range_text)
-                        label_pdrp_column_list_is_range.setFont(QFont('DengXian', 12))
-                        label_pdrp_column_list_is_range.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
-                        layout_grid.addWidget(label_pdrp_column_list_is_range, 13, 0)
-                        new_parameter_settings_widget_list.append(label_pdrp_column_list_is_range)
+                        label_pec_column_list_is_range = QLabel()
+                        label_pec_column_list_is_range_text = 'Is range'
+                        label_pec_column_list_is_range.setText(label_pec_column_list_is_range_text)
+                        label_pec_column_list_is_range.setFont(QFont('DengXian', 12))
+                        label_pec_column_list_is_range.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        layout_grid.addWidget(label_pec_column_list_is_range, 13, 0)
+                        new_parameter_settings_widget_list.append(label_pec_column_list_is_range)
 
-                        dropdown_pdrp_column_list_is_range = QComboBox()
-                        dropdown_pdrp_column_list_is_range.setFont((QFont('DengXian', 12)))
-                        dropdown_pdrp_column_list_is_range.addItems(('True', 'False'))
-                        dropdown_pdrp_column_list_is_range.currentIndexChanged.connect(lambda: button_new_settings_add.setDisabled(True))
-                        layout_grid.addWidget(dropdown_pdrp_column_list_is_range, 13, 1, 1, 3)
-                        new_parameter_settings_widget_list.append(dropdown_pdrp_column_list_is_range)
+                        dropdown_pec_column_list_is_range = QComboBox()
+                        dropdown_pec_column_list_is_range.setFont((QFont('DengXian', 12)))
+                        dropdown_pec_column_list_is_range.addItems(('True', 'False'))
+                        dropdown_pec_column_list_is_range.currentIndexChanged.connect(lambda: button_new_settings_add.setDisabled(True))
+                        layout_grid.addWidget(dropdown_pec_column_list_is_range, 13, 1, 1, 3)
+                        new_parameter_settings_widget_list.append(dropdown_pec_column_list_is_range)
 
                         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                         # Button "Check" settings input --> [Check] [Clear] [Add] 
@@ -1298,12 +1334,12 @@ class AppWindow(QMainWindow):
                         def button_new_settings_check_event():
 
                             # Disabling "Add" button upon next edit:
-                            textbox_pdrp_column_list.textChanged.connect(lambda: button_new_settings_add.setDisabled(True))
+                            textbox_pec_column_list.textChanged.connect(lambda: button_new_settings_add.setDisabled(True))
 
                             # Checking input and enabling "Add" button if input is valid::
                             input_is_valid = True
                             input_has_invalid_character = False
-                            input_string = textbox_pdrp_column_list.text().upper()
+                            input_string = textbox_pec_column_list.text().upper()
                             
                             if len(input_string) > 0:
                                 while input_string[-1] in (',', ' '):
@@ -1330,7 +1366,7 @@ class AppWindow(QMainWindow):
 
                                 if not input_has_invalid_character:
                                     column_list_is_range = False
-                                    if dropdown_pdrp_column_list_is_range.currentText() == 'True':
+                                    if dropdown_pec_column_list_is_range.currentText() == 'True':
                                         column_list_is_range = True
                     
                                     # Generating column list:
@@ -1340,7 +1376,7 @@ class AppWindow(QMainWindow):
                                     column_list_formatted = column_list_str.split(',')
                                     column_list = []
                                     if len(column_list_formatted) == 1:
-                                        dropdown_pdrp_column_list_is_range.setCurrentIndex(1)
+                                        dropdown_pec_column_list_is_range.setCurrentIndex(1)
                                         column_list_is_range = False
                                     else:
                                         if column_list_is_range:
@@ -1380,7 +1416,7 @@ class AppWindow(QMainWindow):
                                         input_is_valid = False 
                             
                             if input_is_valid:
-                                textbox_pdrp_column_list.setText(input_string.upper())
+                                textbox_pec_column_list.setText(input_string.upper())
                                 button_new_settings_add.setDisabled(False)
                             else:
                                 button_new_settings_add.setDisabled(True)
@@ -1394,7 +1430,307 @@ class AppWindow(QMainWindow):
 
                     # PCF settings widgets:
                     elif ParamCompareFlats().param_type_code in selected_parameter_type_string:
-                        pass
+                        
+                        button_shift_row = 15
+
+                        selected_parameter_object = ParamCompareFlats()
+                        selected_parameter_settings = {
+                            'param_check_type': 'ParamEmptyCells',
+                            'param_check_custom_name': textbox_new_parameter_name.text(),
+                            'param_target_worksheet_name': dropdown_new_parameter_target_worksheet.currentText(),
+                            'param_column_list': [],
+                            'param_column_list_is_range': False,
+                            'param_compare_value': None,
+                            'param_compare_axis': None,
+                            'param_compare_axis_inclusive': None,
+                            'param_compare_operator': None
+                            }
+
+                        def update_selected_parameter_settings():
+
+                            # Updating columns:
+                            column_list_string = textbox_pcf_column_list.text()
+                            column_list_is_range = True
+                            if dropdown_pcf_column_list_is_range.currentText() == 'False':
+                                 column_list_is_range = False
+                            selected_parameter_settings['param_column_list'] = column_list_string
+                            selected_parameter_settings['param_column_list_is_range'] = column_list_is_range
+
+                            # Updating operators:
+                            compare_value = float(textbox_pcf_value.text())
+                            compare_operator = dropdown_pcf_operator.currentText()
+                            compare_axis = 'More' if compare_operator in ('>', '>=') else 'Less'
+                            compare_axis_inclusive = True if '=' in compare_operator else False
+                            selected_parameter_settings['param_compare_value'] = compare_value
+                            selected_parameter_settings['param_compare_axis'] = compare_axis
+                            selected_parameter_settings['param_compare_axis_inclusive'] = compare_axis_inclusive
+                            selected_parameter_settings['param_compare_operator'] = compare_operator
+
+                        def check_column_input():
+                            input_string = textbox_pcf_column_list.text()
+                            valid_characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                            valid_separator = ','
+                            if input_string == '':
+                                pass
+                            else:
+                                if len(input_string) == 1:
+                                    if input_string[0] not in valid_characters: input_string = ''
+                                    elif input_string[0] == valid_separator: input_string = ''
+                                else:
+                                    if input_string[-1] == valid_separator:
+                                        if input_string[-2] == valid_separator:
+                                            input_string = input_string[:-1]
+                                    elif input_string[-1] not in valid_characters:
+                                        input_string = input_string[:-1]
+
+                            prev_input = ''
+                            for character in input_string:
+                                if character == valid_separator:
+                                    if len(prev_input) in (1, 2):
+                                        prev_input = ''
+                                    else:
+                                        prev_input += character
+                                        remove_index = len(prev_input) * -1
+                                        input_string = input_string[:remove_index]
+                                        prev_input = ''
+                                        break
+                                else:
+                                    prev_input += character
+                                    if len(prev_input) > 2:
+                                        remove_index = len(prev_input) * -1
+                                        input_string = input_string[:remove_index]
+                                        prev_input = ''
+                                        break
+
+                            textbox_pcf_column_list.setText(input_string)
+
+                            if input_string.count(',') > 1:
+                                dropdown_pcf_column_list_is_range.setCurrentIndex(1)
+
+                        def check_value_input():
+                            input_string = textbox_pcf_value.text()
+                            valid_characters = '1234567890'
+                            valid_separator = '.'
+                            if input_string == '':
+                                pass
+                            else:
+                                if len(input_string) == 1:
+                                    if input_string[0] not in valid_characters: input_string = ''
+                                    elif input_string[0] == valid_separator: input_string = ''
+                                else:
+                                    if input_string[-1] not in f'{valid_characters}{valid_separator}':
+                                        while input_string[-1] not in f'{valid_characters}{valid_separator}':
+                                            if len(input_string) == 1:
+                                                if input_string[0] not in valid_characters: input_string = ''
+                                                elif input_string[0] == valid_separator: input_string = ''
+                                                break
+                                            else: 
+                                                input_string = input_string[:-1]
+                                    else:
+                                        if input_string[-1] == valid_separator and '.' in input_string[:-1]:
+                                            while input_string[-1] == valid_separator:
+                                                input_string = input_string[:-1]
+                                                if len(input_string) == 2:
+                                                    break
+                                                else:
+                                                    if input_string[-1] == valid_separator and '.' not in input_string[:-1]:
+                                                        break
+                            textbox_pcf_value.setText(input_string)
+                            button_new_settings_add.setEnabled(False)
+
+                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # Columns list input textbox --> "Columns": [__________]
+                        label_pcf_column_list = QLabel()
+                        label_pcf_column_list_text = 'Columns'
+                        label_pcf_column_list.setText(label_pcf_column_list_text)
+                        label_pcf_column_list.setFont(QFont('DengXian', 12))
+                        label_pcf_column_list.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        layout_grid.addWidget(label_pcf_column_list, 12, 0)
+                        new_parameter_settings_widget_list.append(label_pcf_column_list)
+
+                        textbox_pcf_column_list = QLineEdit()
+                        textbox_pcf_column_list_text = ''
+                        textbox_pcf_column_list.setText(textbox_pcf_column_list_text)
+                        textbox_pcf_column_list.setFont(QFont('DengXian', 12))
+                        textbox_pcf_column_list.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        textbox_pcf_column_list.textChanged.connect(lambda: check_column_input())
+                        layout_grid.addWidget(textbox_pcf_column_list, 12, 1, 1, 3)
+                        new_parameter_settings_widget_list.append(textbox_pcf_column_list)
+
+                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # Column list is range bool dropdown --> "Is range": [True______] 
+                        #                                                    [False_____]
+                        label_pcf_column_list_is_range = QLabel()
+                        label_pcf_column_list_is_range_text = 'Is range'
+                        label_pcf_column_list_is_range.setText(label_pcf_column_list_is_range_text)
+                        label_pcf_column_list_is_range.setFont(QFont('DengXian', 12))
+                        label_pcf_column_list_is_range.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        layout_grid.addWidget(label_pcf_column_list_is_range, 13, 0)
+                        new_parameter_settings_widget_list.append(label_pcf_column_list_is_range)
+
+                        dropdown_pcf_column_list_is_range = QComboBox()
+                        dropdown_pcf_column_list_is_range.setFont((QFont('DengXian', 12)))
+                        dropdown_pcf_column_list_is_range.addItems(('True', 'False'))
+                        dropdown_pcf_column_list_is_range.currentIndexChanged.connect(lambda: button_new_settings_add.setDisabled(True))
+                        layout_grid.addWidget(dropdown_pcf_column_list_is_range, 13, 1, 1, 3)
+                        new_parameter_settings_widget_list.append(dropdown_pcf_column_list_is_range)
+
+                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # Evaluate inputs --> "Operator": [GT________]
+                        #                                 [GE________]
+                        #                                 [LT________]
+                        #                                 [LE________]
+                        label_pcf_operator = QLabel()
+                        label_pcf_operator_text = 'Operator'
+                        label_pcf_operator.setText(label_pcf_operator_text)
+                        label_pcf_operator.setFont(QFont('DengXian', 12))
+                        label_pcf_operator.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        layout_grid.addWidget(label_pcf_operator, 14, 0)
+                        new_parameter_settings_widget_list.append(label_pcf_operator)
+
+                        dropdown_pcf_operator = QComboBox()
+                        dropdown_pcf_operator.setFont((QFont('DengXian', 12)))
+                        dropdown_pcf_operator.addItems(('>', '>=', '<', '<='))
+                        layout_grid.addWidget(dropdown_pcf_operator, 14, 1)
+                        new_parameter_settings_widget_list.append(dropdown_pcf_operator)
+
+                        label_pcf_value = QLabel()
+                        label_pcf_value_text = 'Compare to value'
+                        label_pcf_value.setText(label_pcf_value_text)
+                        label_pcf_value.setFont(QFont('DengXian', 12))
+                        label_pcf_value.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        layout_grid.addWidget(label_pcf_value, 14, 2)
+                        new_parameter_settings_widget_list.append(label_pcf_value)
+
+                        textbox_pcf_value = QLineEdit()
+                        textbox_pcf_value_text = ''
+                        textbox_pcf_value.setText(textbox_pcf_value_text)
+                        textbox_pcf_value.setFont(QFont('DengXian', 12))
+                        textbox_pcf_value.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        textbox_pcf_value.textChanged.connect(lambda: check_value_input())
+                        layout_grid.addWidget(textbox_pcf_value, 14, 3)
+                        new_parameter_settings_widget_list.append(textbox_pcf_value)
+
+                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # Button "Check" settings input --> [Check] [Clear] [Add] 
+                        #      
+                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # Button "Check" settings input --> [Check] [Clear] [Add] 
+                        #                                      ^
+                        def button_new_settings_check_event():
+
+                            # Disabling "Add" button upon next edit:
+                            textbox_pcf_column_list.textChanged.connect(lambda: button_new_settings_add.setDisabled(True))
+
+                            # Checking input and enabling "Add" button if input is valid::
+                            column_input_is_valid = True
+                            input_has_invalid_character = False
+                            input_string = textbox_pcf_column_list.text().upper()
+                            
+                            # Checking columns:
+                            if len(input_string) > 0:
+                                while input_string[-1] in (',', ' '):
+                                    input_string = input_string[:-1]
+                            
+                            if len(input_string) == 0:
+                                column_input_is_valid = False 
+                            else:
+
+                                # Checking invalid character input:
+                                input_string_test = input_string.replace(',', '')
+                                if len(input_string_test) == 0:
+                                    column_input_is_valid = False
+                                character_list_invalid = '1234567890!@#$%^&*()_+-=[]{}\|\\;\'\:\"./<>?~'
+                                character_list_valid = ',abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                                for character in character_list_invalid:
+                                    if character in input_string:
+                                        input_has_invalid_character = True
+                                        column_input_is_valid = False
+                                for character in input_string:
+                                    if character not in character_list_valid:
+                                        input_has_invalid_character = True
+                                        column_input_is_valid = False
+
+                                if not input_has_invalid_character:
+                                    column_list_is_range = False
+                                    if dropdown_pcf_column_list_is_range.currentText() == 'True':
+                                        column_list_is_range = True
+                    
+                                    # Generating column list:
+                                    column_list_str = str(input_string).replace(' ', '')
+                                    if column_list_str[-1] == ',':
+                                        column_list_str = column_list_str[0:-1]
+                                    column_list_formatted = column_list_str.split(',')
+                                    column_list = []
+                                    if len(column_list_formatted) == 1:
+                                        dropdown_pcf_column_list_is_range.setCurrentIndex(1)
+                                        column_list_is_range = False
+                                    else:
+                                        if column_list_is_range:
+                                            try:
+                                                column_start, column_end = column_list_formatted
+                                                column_list_global = Workbook.get_column_list()
+                                                column_start_index = column_list_global.index(column_start)
+                                                column_end_index = column_list_global.index(column_end)
+                                                column_current_index = column_start_index
+                                                column_list_formatted = []
+                                                while column_current_index <= column_end_index:
+                                                    column = column_list_global[column_current_index]
+                                                    if column not in column_list_formatted:
+                                                        column_list_formatted.append(column)
+                                                    column_current_index += 1
+                                            except:
+                                                column_list_formatted = None
+                                        column_list = column_list_formatted
+
+                                    # Generating range, if column list is range:
+                                    if isinstance(column_list, list):
+                                        if column_list_is_range:
+                                            column_list_global = Workbook.get_column_list()
+                                            column_start = column_list[0]
+                                            column_end = column_list[-1]
+                                            if column_start == column_end:
+                                                dropdown_pdrp_column_list_is_range.setCurrentIndex(1)
+                                                column_list_is_range = False
+                                            else:
+                                                column_start_index = column_list_global.index(column_start)
+                                                column_end_index = column_list_global.index(column_end)
+                                                column_index_difference = int((column_end_index + 1) - column_start_index)
+                                                column_count = len(column_list)
+                                                if column_index_difference != column_count:
+                                                    column_input_is_valid = False
+                                    else:
+                                        column_input_is_valid = False 
+                            
+                            # Checking compare to value:
+                            compare_to_value_is_valid = True
+                            compare_to_value = textbox_pcf_value.text()
+                            if len(compare_to_value) > 0:
+                                try:
+                                    compare_to_value = float(compare_to_value)
+                                    textbox_pcf_value.setText(str(compare_to_value))
+                                except:
+                                    pass
+                            else:
+                                compare_to_value_is_valid = False
+                            
+                            if column_input_is_valid:
+                                textbox_pcf_column_list.setText(input_string.upper())
+                                if compare_to_value_is_valid:
+                                    button_new_settings_add.setDisabled(False)
+                            else:
+                                button_new_settings_add.setDisabled(True)
+                            
+                        button_new_settings_check_caption = 'Check'
+                        button_new_settings_check = create_button(button_caption=button_new_settings_check_caption)
+                        button_new_settings_check.clicked.connect(lambda: button_new_settings_check_event())
+                        button_new_settings_check.setDisabled(False)
+                        layout_grid.addWidget(button_new_settings_check, button_shift_row, 1)
+                        new_parameter_settings_widget_list.append(button_new_settings_check)
+
+                        
+
+
 
                     # PCS settings widgets:
                     elif ParamCompareSums().param_type_code in selected_parameter_type_string:
@@ -1454,7 +1790,7 @@ class AppWindow(QMainWindow):
                         selected_parameter_object.param_flag_header_col = header_column
 
                         # Validating:
-                        selected_parameter_object._validate()
+                        # selected_parameter_object._validate()
 
                         list_parameters.addItem(selected_parameter_object.display)
                         self.parameters_list.append(selected_parameter_object)
@@ -1476,6 +1812,8 @@ class AppWindow(QMainWindow):
                         button_read.setDisabled(False)           # Side menu
                         button_add.setDisabled(False)
                         list_parameters.setDisabled(False)
+
+                        
 
                     button_new_settings_add_caption = 'Add'
                     button_new_settings_add = create_button(button_caption=button_new_settings_add_caption)
@@ -1558,7 +1896,8 @@ class AppWindow(QMainWindow):
                 # Removing from display:
                 list_parameters.takeItem(list_parameters.row(selected_item))
 
-            button_remove.setDisabled(True)
+            if len(list_parameters.selectedItems()) == 0:
+                button_remove.setDisabled(True)
 
         button_remove_caption = 'Remove'
         button_remove = create_button(button_caption=button_remove_caption)
@@ -1660,13 +1999,14 @@ class AppWindow(QMainWindow):
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # End separator:
         
-        final_row = 15
+        final_row = 17
         for row in range(7, final_row):
             label_parameters = QLabel()
             label_parameters_text = f''
             label_parameters.setText(label_parameters_text)
             label_parameters.setFont(QFont('DengXian', 12))
             label_parameters.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            label_parameters.setFixedHeight(20)
             layout_grid.addWidget(label_parameters, row, 0, 1, 4)
         label_parameters = QLabel()
         label_parameters_text = f'。'
