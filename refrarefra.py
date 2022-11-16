@@ -384,7 +384,6 @@ class ParamDuplicateRows(ParamCore):
         super().setup(**param_settings)
         
         # Finalizing: 
-        self._validate()
         self._feed()
 
     def connect(self, workbook: Workbook):
@@ -467,7 +466,6 @@ class ParamDuplicateRowsPartial(ParamCore):
         self._result_info = result_info_str
         
         # Finalizing: 
-        self._validate()
         self._feed()
 
     def connect(self, workbook: Workbook):
@@ -550,7 +548,6 @@ class ParamEmptyCells(ParamCore):
         self._result_info = result_info_str
         
         # Finalizing: 
-        self._validate()
         self._feed()
 
     def connect(self, workbook: Workbook):
@@ -665,7 +662,6 @@ class ParamCompareFlats(ParamCore):
         self._result_info = result_info_precon
         
         # Finalizing: 
-        self._validate()
         self._feed()
 
     def connect(self, workbook: Workbook):
@@ -683,6 +679,7 @@ class ParamCompareSums(ParamCore):
 
         # Column list settings:
         self.param_column_list: list or str = None
+        self.param_column_sum: list or str = None
 
         # Default settings:
         self.param_flag_header_name_default: str = self.param_type_code
@@ -706,6 +703,9 @@ class ParamCompareSums(ParamCore):
         column_list_str = str(self.param_column_list).replace(' ', '')
         column_list_formatted = column_list_str.split(',')
         self.param_column_list = column_list_formatted
+        column_sum_str = str(self.param_column_sum).replace(' ', '')
+        column_sum_str_formatted = column_sum_str.split(',')
+        self.param_column_sum = column_sum_str_formatted
 
         # Updating result info string line:
         column_list_str_res = ''
@@ -721,7 +721,6 @@ class ParamCompareSums(ParamCore):
         self._result_info = result_info_str
 
         # Finalizing: 
-        self._validate()
         self._feed()
 
 
@@ -1596,7 +1595,7 @@ class AppWindow(QMainWindow):
                         new_parameter_settings_widget_list.append(dropdown_pcf_operator)
 
                         label_pcf_value = QLabel()
-                        label_pcf_value_text = 'Compare to value'
+                        label_pcf_value_text = 'Compare to'
                         label_pcf_value.setText(label_pcf_value_text)
                         label_pcf_value.setFont(QFont('DengXian', 12))
                         label_pcf_value.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
@@ -1729,13 +1728,104 @@ class AppWindow(QMainWindow):
                         layout_grid.addWidget(button_new_settings_check, button_shift_row, 1)
                         new_parameter_settings_widget_list.append(button_new_settings_check)
 
-                        
-
-
-
                     # PCS settings widgets:
                     elif ParamCompareSums().param_type_code in selected_parameter_type_string:
-                        pass
+                        
+                        button_shift_row = 14
+
+                        selected_parameter_object = ParamCompareFlats()
+                        selected_parameter_settings = {
+                            'param_check_type': 'ParamEmptyCells',
+                            'param_check_custom_name': textbox_new_parameter_name.text(),
+                            'param_target_worksheet_name': dropdown_new_parameter_target_worksheet.currentText(),
+                            'param_column_list': [],
+                            'param_column_sum': [],
+                            }
+
+                        def update_selected_parameter_settings():
+
+                            # Updating columns:
+                            column_list_string = textbox_pcf_column_list.text()
+                            selected_parameter_settings['param_column_list'] = column_list_string
+                            column_sum_string = textbox_pcs_sum_column_list.text()
+                            selected_parameter_settings['param_column_sum'] = column_sum_string
+
+                        def check_column_input():
+                            input_string = textbox_pcs_column_list.text()
+                            valid_characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                            valid_separator = ','
+                            if input_string == '':
+                                pass
+                            else:
+                                if len(input_string) == 1:
+                                    if input_string[0] not in valid_characters: input_string = ''
+                                    elif input_string[0] == valid_separator: input_string = ''
+                                else:
+                                    if input_string[-1] == valid_separator:
+                                        if input_string[-2] == valid_separator:
+                                            input_string = input_string[:-1]
+                                    elif input_string[-1] not in valid_characters:
+                                        input_string = input_string[:-1]
+
+                            prev_input = ''
+                            for character in input_string:
+                                if character == valid_separator:
+                                    if len(prev_input) in (1, 2):
+                                        prev_input = ''
+                                    else:
+                                        prev_input += character
+                                        remove_index = len(prev_input) * -1
+                                        input_string = input_string[:remove_index]
+                                        prev_input = ''
+                                        break
+                                else:
+                                    prev_input += character
+                                    if len(prev_input) > 2:
+                                        remove_index = len(prev_input) * -1
+                                        input_string = input_string[:remove_index]
+                                        prev_input = ''
+                                        break
+
+                            textbox_pcs_column_list.setText(input_string)
+
+                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # Columns list input textbox --> "Columns check": [__________]
+                        label_pcs_column_list = QLabel()
+                        label_pcs_column_list_text = 'Columns check'
+                        label_pcs_column_list.setText(label_pcs_column_list_text)
+                        label_pcs_column_list.setFont(QFont('DengXian', 12))
+                        label_pcs_column_list.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        layout_grid.addWidget(label_pcs_column_list, 12, 0)
+                        new_parameter_settings_widget_list.append(label_pcs_column_list)
+
+                        textbox_pcs_column_list = QLineEdit()
+                        textbox_pcs_column_list_text = ''
+                        textbox_pcs_column_list.setText(textbox_pcs_column_list_text)
+                        textbox_pcs_column_list.setFont(QFont('DengXian', 12))
+                        textbox_pcs_column_list.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        textbox_pcs_column_list.textChanged.connect(lambda: check_column_input())
+                        layout_grid.addWidget(textbox_pcs_column_list, 12, 1, 1, 3)
+                        new_parameter_settings_widget_list.append(textbox_pcs_column_list)
+
+                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # Columns list input textbox --> "Column sum": [__________]
+                        label_pcs_sum_column_list = QLabel()
+                        label_pcs_sum_column_list_text = 'Column sum'
+                        label_pcs_sum_column_list.setText(label_pcs_sum_column_list_text)
+                        label_pcs_sum_column_list.setFont(QFont('DengXian', 12))
+                        label_pcs_sum_column_list.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        layout_grid.addWidget(label_pcs_sum_column_list, 13, 0)
+                        new_parameter_settings_widget_list.append(label_pcs_sum_column_list)
+
+                        textbox_pcs_sum_column_list = QLineEdit()
+                        textbox_pcs_sum_column_list_text = ''
+                        textbox_pcs_sum_column_list.setText(textbox_pcs_sum_column_list_text)
+                        textbox_pcs_sum_column_list.setFont(QFont('DengXian', 12))
+                        textbox_pcs_sum_column_list.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
+                        textbox_pcs_sum_column_list.textChanged.connect(lambda: check_column_input())
+                        layout_grid.addWidget(textbox_pcs_sum_column_list, 13, 1, 1, 3)
+                        new_parameter_settings_widget_list.append(textbox_pcs_sum_column_list)
+
 
                     # PCT settings widgets:
                     # elif ParamCompareTime().param_type_code in selected_parameter_type_string:
@@ -1791,7 +1881,7 @@ class AppWindow(QMainWindow):
                         selected_parameter_object.param_flag_header_col = header_column
 
                         # Validating:
-                        # selected_parameter_object._validate()
+                        selected_parameter_object._validate()
 
                         list_parameters.addItem(selected_parameter_object.display)
                         self.parameters_list.append(selected_parameter_object)
@@ -1813,8 +1903,6 @@ class AppWindow(QMainWindow):
                         button_read.setDisabled(False)           # Side menu
                         button_add.setDisabled(False)
                         list_parameters.setDisabled(False)
-
-                        
 
                     button_new_settings_add_caption = 'Add'
                     button_new_settings_add = create_button(button_caption=button_new_settings_add_caption)
