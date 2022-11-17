@@ -1831,6 +1831,7 @@ class AppWindow(QMainWindow):
                     # elif ParamCompareTime().param_type_code in selected_parameter_type_string:
                     #     TODO:
                     #     pass
+                    
 
                     # Removing old buttons:
                     for ui_element in new_parameter_core_widget_list:
