@@ -31,15 +31,17 @@ class Workbook:
 
         self._default_workbook_file_name: str = 'Book1'
         self._default_workbook_file_extension: str = 'xlsx'
-        self._default_workbook_file_location: str = ''
+        self._default_workbook_file_name_pattern: str = f'\\w+.{self._default_workbook_file_extension}'
+        self._default_workbook_file_location: str = os.path.dirname(__file__)
         self._default_worksheet_name_param: str = 'P_LIST'
         self._default_worksheet_name_results: str = 'P_RESULT'
 
+        self._save_mode_default: str = 'Save as'        # Save / Save as
         self._save_prefix_allowed: bool = False
-        self._save_prefix: str = None
+        self._save_prefix: str = 'PREFIX'
         self._save_postfix_allowed: bool = False
-        self._save_postfix: str = None
-        self._save_timestamp_allowed: bool = False
+        self._save_postfix: str = 'POSTFIX'
+        self._save_timestamp_allowed: bool = True
         self._save_timestamp_format: str = '%Y%m%d_%H%M%S'
 
         self._active_workbook: openpyxl.Workbook = None
@@ -51,7 +53,7 @@ class Workbook:
 
         self._reserved_row: int = 2
 
-        
+
     @classmethod
     def get_column_list(self):
         
@@ -89,7 +91,13 @@ class Workbook:
             # Handling workbook object:
             workbook_object = openpyxl.load_workbook(filename=document_path)
             self._active_workbook = workbook_object
-            # self._active_workbook_name = TODO: Regex
+            self._active_workbook_name = re.findall(
+                pattern=self._default_workbook_file_name_pattern,
+                string=document_path
+                )[0]
+            self._active_workbook_name = self._active_workbook_name.replace(
+                f'.{self._default_workbook_file_extension}',''
+                )
             self._active_workbook_path = document_path
             self._active_workbook_worksheet_list = workbook_object.sheetnames
 
@@ -111,7 +119,14 @@ class Workbook:
         pass
 
     def save_workbook(self,):
-        pass
+
+        # Saving workbook:
+        if self._save_mode_default == 'Save':
+            save_filename=self._active_workbook_path
+            self._active_workbook.save(filename=save_filename)
+        
+        elif self._save_mode_default == 'Save as':
+            self.save_workbook_as()
 
     def save_workbook_as(self):
         
@@ -131,13 +146,14 @@ class Workbook:
                 set_prefix = f'{self._save_prefix}_' if self._save_prefix_allowed else '',
                 set_postfix = f'_{self._save_postfix}' if self._save_postfix_allowed else '',
                 set_timestamp = f'_{generate_timestamp()}' if self._save_timestamp_allowed else '',
-                file_name = '',         # Save filename         TODO: Get filename
-                file_extension = ''     # Filename extension    TODO: Get extension
+                file_name = self._active_workbook_name,
+                file_extension = self._default_workbook_file_extension
                 )
 
             return save_filename
         
-        pass
+        save_filename = os.path.join(self._default_workbook_file_location, generate_save_filename())
+        self._active_workbook.save(save_filename)
     
     def reset_workbook(self):
         pass
@@ -164,26 +180,29 @@ class Workbook:
             parameter_string_split = parameter_string.split(',,')
             parameter_pair_list = [parameter_pair.split('=') for parameter_pair in parameter_string_split]
             return parameter_pair_list
-        
-        # Switching worksheet:
-        parameter_worksheet_name = self._default_worksheet_name_param
-        self.switch_worksheet(target_worksheet_name=parameter_worksheet_name)
-    
-        # Parameter list variable:
-        parameter_list = []
 
-        # Reading parameters:
-        row_max = self._active_worksheet.max_row
-        row_range = range(1, row_max + 1)
-        column = 'A'
-        for row in row_range:
-            cell_target = f'{column}{row}'
-            cell_value = self.read_cell(cell_position=cell_target)
-            if cell_value is not None:
-                parameter_string = cell_value
-                parameter_pair_list = read_parameter_string(parameter_string)
-                parameter_list.append(parameter_pair_list)
+        # Switching worksheet:
+        if self._default_worksheet_name_param in self._active_workbook_worksheet_list:
+            parameter_worksheet_name = self._default_worksheet_name_param
+            self.switch_worksheet(target_worksheet_name=parameter_worksheet_name)
         
+            # Parameter list variable:
+            parameter_list = []
+
+            # Reading parameters:
+            row_max = self._active_worksheet.max_row
+            row_range = range(1, row_max + 1)
+            column = 'A'
+            for row in row_range:
+                cell_target = f'{column}{row}'
+                cell_value = self.read_cell(cell_position=cell_target)
+                if cell_value is not None:
+                    parameter_string = cell_value
+                    parameter_pair_list = read_parameter_string(parameter_string)
+                    parameter_list.append(parameter_pair_list)
+            
+            return parameter_list
+                
     def get_cell(self, cell_position: str):
         cell_value = self.read_cell(cell_position)
         cell_object = Cell(position=cell_position, value=cell_value)
@@ -195,6 +214,40 @@ class Workbook:
     
     def write_cell(self, cell_position: str, write_value: Any):
         self._active_worksheet[cell_position] = write_value
+
+    def write_saved_parameters(self, parameter_list: list):
+        
+        # Creating and/or switching worksheets:
+        if self._default_worksheet_name_param not in self._active_workbook_worksheet_list:
+            self.create_worksheet(create_worksheet_name=self._default_worksheet_name_param)
+        self.switch_worksheet(target_worksheet_name=self._default_worksheet_name_param)
+
+        # Getting next empty row:
+        column_write = 'A'
+        row_write = int(self._active_worksheet.max_row + 1)
+
+        # Getting settings and generating string to write:
+        for parameter_object in parameter_list:
+            parameter_attributes = parameter_object.__dict__
+            parameter_string = ''
+            setting_ignore_list = ('param_highlight_cell_pattern',
+                                   'param_highlight_cell',
+                                   'param_highlight_cell_hue',
+                                   'param_highlight_cell_hue_default',
+                                   '_ready',
+                                   '_result',
+                                   '_result_info',
+                                   '_result_count',
+                                   '_validated')
+            for setting, value in parameter_attributes.items():
+                if setting not in setting_ignore_list:
+                    parameter_string += f',,{setting}={value}'
+            parameter_string = parameter_string[2:]
+            cell_write = f'{column_write}{row_write}'
+            self.write_cell(cell_position=cell_write, write_value=parameter_string)
+
+            # Next row:
+            row_write += 1
 
     def get_header_column(self, target_worksheet_name: str, header_value: str):
 
@@ -454,7 +507,7 @@ class ParamDuplicateRowsPartial(ParamCore):
         column_start = self.param_column_list[0]
         column_end = self.param_column_list[-1]
         if self.param_column_list_is_range:
-            column_list_str_res = f'{column_start}:{column_end}'
+            column_list_str_res = f'{column_start} : {column_end}'
         else:
             column_end = self.param_column_list[-1]
             for column in self.param_column_list:
@@ -518,7 +571,7 @@ class ParamEmptyCells(ParamCore):
         column_list_str = str(self.param_column_list).replace(' ', '')
         column_list_formatted = column_list_str.split(',')
         if self.param_column_list_is_range:
-            column_start, column_end = column_list_formatted
+            column_start, column_end = column_list_formatted[0], column_list_formatted[-1]
             column_list_global = Workbook.get_column_list()
             column_start_index = column_list_global.index(column_start)
             column_end_index = column_list_global.index(column_end)
@@ -536,7 +589,7 @@ class ParamEmptyCells(ParamCore):
         column_start = self.param_column_list[0]
         column_end = self.param_column_list[-1]
         if self.param_column_list_is_range:
-            column_list_str_res = f'{column_start}:{column_end}'
+            column_list_str_res = f'{column_start} : {column_end}'
         else:
             column_end = self.param_column_list[-1]
             for column in self.param_column_list:
@@ -647,7 +700,7 @@ class ParamCompareFlats(ParamCore):
         column_start = self.param_column_list[0]
         column_end = self.param_column_list[-1]
         if self.param_column_list_is_range:
-            column_list_str_res = f'{column_start}:{column_end}'
+            column_list_str_res = f'{column_start} : {column_end}'
         else:
             column_end = self.param_column_list[-1]
             for column in self.param_column_list:
@@ -709,13 +762,14 @@ class ParamCompareSums(ParamCore):
 
         # Updating result info string line:
         column_list_str_res = ''
-        column_add_list = self.param_column_list[:-1]
+        column_add_list = self.param_column_list
+        column_list_str_res = column_add_list[0]
         for column in column_add_list:
             if column_add_list.index(column) == 0:
-                column_list_str_res = f'{column}'
+                pass
             else:
-                column_list_str_res = f'{column_list_str_res} + {column}'
-        column_sum_check = self.param_column_list[-1]
+                column_list_str_res += f' + {column}'
+        column_sum_check = self.param_column_sum[0]
         column_list_str_res = f'{column_list_str_res} <> {column_sum_check}'
         result_info_str = f'{column_list_str_res}'
         self._result_info = result_info_str
@@ -733,6 +787,7 @@ class ParamListed:
     name_displayed: str = None
     parameter_class_object: ParamCore = None
 
+
 class AppWindow(QMainWindow):
 
     def __init__(self):
@@ -742,7 +797,7 @@ class AppWindow(QMainWindow):
         self.app_window_title: str = 'Test Interface'
         self.app_layout: Any = None
 
-        self.parameters_list = []
+        self.parameter_list = []
 
     
     def setup(self):
@@ -800,7 +855,6 @@ class AppWindow(QMainWindow):
 
             # Saving workbook:
             self.app_workbook.save_workbook()
-            pass
 
         button_save_caption = 'Save'
         button_save = create_button(button_caption=button_save_caption)
@@ -872,10 +926,45 @@ class AppWindow(QMainWindow):
         # Button "Read", parameters manager menu:
 
         def button_read_event():
-            
+
             # Reading parameter setups from P_LIST in workbook:
+            parameter_list = self.app_workbook.read_parameter_worksheet()
             
-                self.app_workbook.read_parameter_worksheet()
+            if len(parameter_list) > 0:
+                for parameter in parameter_list:
+                    parameter_setup_dict = {}
+                    for setting_value_pair in parameter:
+                        setting, value = setting_value_pair
+                        if '[' in value:
+                            column_list_pattern = '[a-zA-Z]+'
+                            column_list = re.findall(column_list_pattern, value)
+                            column_string = ''
+                            for column in column_list:
+                                if column_list.index(column) == 0: column_string = f'{column}'
+                                else: column_string += f',{column}'
+                            value = column_string
+                        else:
+                            if value in ('True', 'False'): value = True if value == 'True' else False
+                        parameter_setup_dict[setting] = value
+                    parameter_type_code = parameter_setup_dict['param_type_code']
+                    parameter_object: ParamCore = None
+                    if parameter_type_code == 'PDR': parameter_object = ParamDuplicateRows()
+                    elif parameter_type_code == 'PDR-P': parameter_object = ParamDuplicateRowsPartial()
+                    elif parameter_type_code == 'PEC': parameter_object = ParamEmptyCells()
+                    elif parameter_type_code == 'PCF': parameter_object = ParamCompareFlats()
+                    elif parameter_type_code == 'PCS': parameter_object = ParamCompareSums()
+                    parameter_object.setup(**parameter_setup_dict)
+
+                    parameter_already_exists: bool = False
+                    parameter_name = parameter_object.param_check_custom_name
+                    for registered_parameter in self.parameter_list:
+                        if registered_parameter.param_check_custom_name == parameter_name: 
+                            parameter_already_exists = True
+                            break
+
+                    if not parameter_already_exists:
+                        list_parameters.addItem(parameter_object.display)
+                        self.parameter_list.append(parameter_object)
 
         button_read_caption = 'Read'
         button_read = create_button(button_caption=button_read_caption)
@@ -899,7 +988,7 @@ class AppWindow(QMainWindow):
                 button_add.setDisabled(True)
                 button_remove.setDisabled(True)
                 button_edit.setDisabled(True)
-                button_save_param.setDisabled(True)
+                button_save_param.setDisabled(False)
                 list_parameters.setDisabled(False)
 
                 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -959,7 +1048,7 @@ class AppWindow(QMainWindow):
                     if len(new_parameter_name) == 0:
                         button_new_parameter_continue.setDisabled(True)
                     else:
-                        for parameter_object in self.parameters_list:
+                        for parameter_object in self.parameter_list:
                             parameter_object_name = parameter_object.param_check_custom_name
                             if new_parameter_name == parameter_object_name:
                                 button_new_parameter_continue.setDisabled(True)
@@ -1610,10 +1699,7 @@ class AppWindow(QMainWindow):
                         textbox_pcf_value.textChanged.connect(lambda: check_value_input())
                         layout_grid.addWidget(textbox_pcf_value, 14, 3)
                         new_parameter_settings_widget_list.append(textbox_pcf_value)
-
-                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                        # Button "Check" settings input --> [Check] [Clear] [Add] 
-                        #      
+   
                         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                         # Button "Check" settings input --> [Check] [Clear] [Add] 
                         #                                      ^
@@ -1733,7 +1819,7 @@ class AppWindow(QMainWindow):
                         
                         button_shift_row = 14
 
-                        selected_parameter_object = ParamCompareFlats()
+                        selected_parameter_object = ParamCompareSums()
                         selected_parameter_settings = {
                             'param_check_type': 'ParamEmptyCells',
                             'param_check_custom_name': textbox_new_parameter_name.text(),
@@ -1745,7 +1831,7 @@ class AppWindow(QMainWindow):
                         def update_selected_parameter_settings():
 
                             # Updating columns:
-                            column_list_string = textbox_pcf_column_list.text()
+                            column_list_string = textbox_pcs_column_list.text()
                             selected_parameter_settings['param_column_list'] = column_list_string
                             column_sum_string = textbox_pcs_sum_column_list.text()
                             selected_parameter_settings['param_column_sum'] = column_sum_string
@@ -1787,6 +1873,46 @@ class AppWindow(QMainWindow):
                                         break
 
                             textbox_pcs_column_list.setText(input_string)
+                            button_new_settings_add.setDisabled(True)
+
+                        def check_column_sum_input():
+                            input_string = textbox_pcs_sum_column_list.text()
+                            valid_characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                            valid_separator = ','
+                            if input_string == '':
+                                pass
+                            else:
+                                if len(input_string) == 1:
+                                    if input_string[0] not in valid_characters: input_string = ''
+                                    elif input_string[0] == valid_separator: input_string = ''
+                                else:
+                                    if input_string[-1] == valid_separator:
+                                        if input_string[-2] == valid_separator:
+                                            input_string = input_string[:-1]
+                                    elif input_string[-1] not in valid_characters:
+                                        input_string = input_string[:-1]
+
+                            prev_input = ''
+                            for character in input_string:
+                                if character == valid_separator:
+                                    if len(prev_input) in (1, 2):
+                                        prev_input = ''
+                                    else:
+                                        prev_input += character
+                                        remove_index = len(prev_input) * -1
+                                        input_string = input_string[:remove_index]
+                                        prev_input = ''
+                                        break
+                                else:
+                                    prev_input += character
+                                    if len(prev_input) > 2:
+                                        remove_index = len(prev_input) * -1
+                                        input_string = input_string[:remove_index]
+                                        prev_input = ''
+                                        break
+
+                            textbox_pcs_sum_column_list.setText(input_string)
+                            button_new_settings_add.setDisabled(True)
 
                         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                         # Columns list input textbox --> "Columns check": [__________]
@@ -1822,9 +1948,60 @@ class AppWindow(QMainWindow):
                         textbox_pcs_sum_column_list.setText(textbox_pcs_sum_column_list_text)
                         textbox_pcs_sum_column_list.setFont(QFont('DengXian', 12))
                         textbox_pcs_sum_column_list.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft)
-                        textbox_pcs_sum_column_list.textChanged.connect(lambda: check_column_input())
+                        textbox_pcs_sum_column_list.textChanged.connect(lambda: check_column_sum_input())
                         layout_grid.addWidget(textbox_pcs_sum_column_list, 13, 1, 1, 3)
                         new_parameter_settings_widget_list.append(textbox_pcs_sum_column_list)
+
+                        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                        # Button "Check" settings input --> [Check] [Clear] [Add] 
+                        #                                      ^
+                        def button_new_settings_check_event():
+
+                            column_input_is_valid = True
+                            input_has_invalid_character = False
+
+                            for textbox in (textbox_pcs_column_list, textbox_pcs_sum_column_list):
+
+                                # Checking input and enabling "Add" button if input is valid::
+                                column_input_is_valid = True
+                                input_has_invalid_character = False
+                                input_string = textbox.text().upper()
+                                
+                                # Checking columns:
+                                if len(input_string) > 0:
+                                    while input_string[-1] in (',', ' '):
+                                        input_string = input_string[:-1]
+                                
+                                if len(input_string) == 0:
+                                    column_input_is_valid = False 
+                                else:
+
+                                    # Checking invalid character input:
+                                    input_string_test = input_string.replace(',', '')
+                                    if len(input_string_test) == 0:
+                                        column_input_is_valid = False
+                                    character_list_invalid = '1234567890!@#$%^&*()_+-=[]{}\|\\;\'\:\"./<>?~'
+                                    character_list_valid = ',abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                                    for character in character_list_invalid:
+                                        if character in input_string:
+                                            input_has_invalid_character = True
+                                    for character in input_string:
+                                        if character not in character_list_valid:
+                                            input_has_invalid_character = True
+                                if input_has_invalid_character:
+                                    column_input_is_valid = False
+                                if column_input_is_valid:
+                                    textbox.setText(input_string)
+                            
+                            if column_input_is_valid:
+                                button_new_settings_add.setDisabled(False)
+
+                        button_new_settings_check_caption = 'Check'
+                        button_new_settings_check = create_button(button_caption=button_new_settings_check_caption)
+                        button_new_settings_check.clicked.connect(lambda: button_new_settings_check_event())
+                        button_new_settings_check.setDisabled(False)
+                        layout_grid.addWidget(button_new_settings_check, button_shift_row, 1)
+                        new_parameter_settings_widget_list.append(button_new_settings_check)
 
 
                     # PCT settings widgets:
@@ -1885,8 +2062,7 @@ class AppWindow(QMainWindow):
                         selected_parameter_object._validate()
 
                         list_parameters.addItem(selected_parameter_object.display)
-                        self.parameters_list.append(selected_parameter_object)
-                        pprint(selected_parameter_object.__dict__)
+                        self.parameter_list.append(selected_parameter_object)
 
                         # Removing widgets:
                         for ui_element in new_parameter_core_widget_list:
@@ -1974,14 +2150,14 @@ class AppWindow(QMainWindow):
                 selected_parameter_name = re.findall(pattern=selected_parameter_name_pattern, 
                                                      string=selected_parameter_string)[0]
                 selected_parameter: ParamCore = None
-                for parameter_object in self.parameters_list:
+                for parameter_object in self.parameter_list:
                     parameter_object_name = parameter_object.param_check_custom_name
                     if parameter_object_name == selected_parameter_name:
                         selected_parameter = parameter_object
                         break
                 
-                if selected_parameter in self.parameters_list:
-                    self.parameters_list.remove(selected_parameter)
+                if selected_parameter in self.parameter_list:
+                    self.parameter_list.remove(selected_parameter)
                 
                 # Removing from display:
                 list_parameters.takeItem(list_parameters.row(selected_item))
@@ -2004,7 +2180,7 @@ class AppWindow(QMainWindow):
             selected_parameter_name = re.findall(pattern=selected_parameter_name_pattern, 
                                                  string=selected_parameter_string)[0]
             selected_parameter: ParamCore = None
-            for parameter_object in self.parameters_list:
+            for parameter_object in self.parameter_list:
                 parameter_object_name = parameter_object.param_check_custom_name
                 if parameter_object_name == selected_parameter_name:
                     selected_parameter = parameter_object
@@ -2068,12 +2244,12 @@ class AppWindow(QMainWindow):
         # Button "Save", parameters manager menu:
 
         def button_save_param_event():
-            pass
+            self.app_workbook.write_saved_parameters(parameter_list=self.parameter_list)
 
         button_save_param_caption = 'Save'
         button_save_param = create_button(button_caption=button_save_param_caption)
-        button_save_param.clicked.connect(lambda: button_edit_event())
-        button_save_param.setDisabled(True)
+        button_save_param.clicked.connect(lambda: button_save_param_event())
+        button_save_param.setDisabled(False)
         layout_grid.addWidget(button_save_param, 6, 0)
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
