@@ -2147,20 +2147,23 @@ class AppWindow(QMainWindow):
                 # Removing from active parameters list:
                 selected_parameter_string = list_parameters.currentItem().text()
                 selected_parameter_name_pattern: str = '\"(\w+)\"'
-                selected_parameter_name = re.findall(pattern=selected_parameter_name_pattern, 
-                                                     string=selected_parameter_string)[0]
-                selected_parameter: ParamCore = None
-                for parameter_object in self.parameter_list:
-                    parameter_object_name = parameter_object.param_check_custom_name
-                    if parameter_object_name == selected_parameter_name:
-                        selected_parameter = parameter_object
-                        break
-                
-                if selected_parameter in self.parameter_list:
-                    self.parameter_list.remove(selected_parameter)
-                
-                # Removing from display:
-                list_parameters.takeItem(list_parameters.row(selected_item))
+                try:
+                    selected_parameter_name = re.findall(pattern=selected_parameter_name_pattern, 
+                                                        string=selected_parameter_string)[0]
+                    selected_parameter: ParamCore = None
+                    for parameter_object in self.parameter_list:
+                        parameter_object_name = parameter_object.param_check_custom_name
+                        if parameter_object_name == selected_parameter_name:
+                            selected_parameter = parameter_object
+                            break
+                    
+                    if selected_parameter in self.parameter_list:
+                        self.parameter_list.remove(selected_parameter)
+                    
+                    # Removing from display:
+                    list_parameters.takeItem(list_parameters.row(selected_item))
+                except:
+                    list_parameters.selectAll()
 
             if len(list_parameters.selectedItems()) == 0:
                 button_remove.setDisabled(True)
